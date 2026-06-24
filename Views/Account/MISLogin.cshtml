@@ -2,49 +2,51 @@
     ViewData["Title"] = "MIS Login";
 }
 
-<link rel="stylesheet" href="~/css/adminlogin.css" />
+<div class="min-h-screen flex items-center justify-center"
+     style="background: linear-gradient(135deg, #4f46e5, #6d28d9);">
 
-<div class="login-background">
+    <div class="bg-white rounded-[70px] shadow-2xl text-center"
+         style="width:800px; min-height:600px; padding:80px 80px 60px 80px;">
 
-    <div class="login-card px-md-2">
-
-        <div class="logo-section">
-            <img src="/images/bookhive_logo_v2.svg" class="w-[150px] mb-3" />
-            <h3 class="text-xl mb-2">MIS Portal Login</h3>
-            <p class="text-gray-400 text-sm mb-8">Sign in with your Microsoft account</p>
+        <!-- Logo -->
+        <div class="flex flex-col items-center">
+            <img src="/images/bookhive_logo_v2.svg" class="w-[220px] mb-4" />
+            <h3 class="text-2xl mb-8">MIS Portal Login</h3>
         </div>
 
         @if (TempData["Error"] != null)
         {
-            <div class="w-[470px] bg-red-50 border border-red-300 text-red-700 text-sm px-4 py-3 rounded-xl mb-6 text-center">
+            <div class="bg-red-50 border border-red-300 text-red-700 text-sm px-4 py-3 rounded-xl mb-6 text-center">
                 @TempData["Error"]
             </div>
         }
 
-        <a asp-controller="Account"
-           asp-action="MicrosoftLogin"
-           class="w-[470px] h-[70px] bg-white border-2 border-gray-200 rounded-3xl shadow-md flex items-center justify-center gap-4 text-xl hover:bg-gray-50 transition mb-10">
+        <!-- Sign in Button -->
+        <div class="flex justify-center mt-10">
+            <a asp-controller="Account"
+               asp-action="MicrosoftLogin"
+               class="w-[470px] h-[70px] bg-white border-2 border-gray-200 rounded-3xl shadow-md flex items-center justify-center gap-4 text-xl hover:bg-gray-50 transition">
 
-            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 21 21">
-                <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
-                <rect x="11" y="1" width="9" height="9" fill="#00a4ef"/>
-                <rect x="1" y="11" width="9" height="9" fill="#7fba00"/>
-                <rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
-            </svg>
+                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 21 21">
+                    <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
+                    <rect x="11" y="1" width="9" height="9" fill="#00a4ef"/>
+                    <rect x="1" y="11" width="9" height="9" fill="#7fba00"/>
+                    <rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
+                </svg>
 
-            Sign in with Microsoft
+                Sign in with Microsoft
 
-        </a>
+            </a>
+        </div>
 
-        <p class="text-gray-400 text-sm text-center mb-6">
-            Microsoft Authenticator will be used to verify your identity.
-        </p>
-
-        <a asp-controller="Account"
-           asp-action="Login"
-           class="back-btn">
-            ← Back
-        </a>
+        <!-- Back -->
+        <div class="flex justify-end mt-10">
+            <a asp-controller="Account"
+               asp-action="Login"
+               class="text-violet-700 text-lg no-underline hover:text-violet-900">
+                ← Back
+            </a>
+        </div>
 
     </div>
 
