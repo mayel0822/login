@@ -1,0 +1,149 @@
+@using BookHiveLibrary.Models
+@model BookReservation
+@{
+    Layout = "~/Views/Shared/_LibrarianLayout.cshtml";
+    ViewData["Title"] = "Transaction Detail";
+}
+
+<div class="max-w-2xl">
+    <div class="flex items-center gap-3 mb-6">
+        <a href="/Borrow" class="text-violet-700 hover:underline text-sm">← Transactions</a>
+        <h1 class="text-3xl font-bold text-gray-800">Transaction #@Model.Id</h1>
+        <span class="px-3 py-1 rounded-full text-sm
+            @(Model.Status == "Pending"  ? "bg-yellow-100 text-yellow-700" :
+              Model.Status == "Approved" ? "bg-blue-100 text-blue-700" :
+              Model.Status == "PickedUp" ? "bg-green-100 text-green-700" :
+              Model.Status == "Overdue"  ? "bg-red-100 text-red-700" :
+              Model.Status == "Returned" ? "bg-gray-100 text-gray-600" :
+              "bg-gray-100 text-gray-500")">
+            @Model.Status
+        </span>
+    </div>
+
+    <div class="grid grid-cols-2 gap-5">
+
+        <!-- Borrower Info -->
+        <div class="bg-white rounded-2xl shadow p-6">
+            <h3 class="font-semibold text-gray-700 mb-4">Borrower Information</h3>
+            <dl class="space-y-2 text-sm">
+                <div class="flex justify-between">
+                    <dt class="text-gray-500">Name</dt>
+                    <dd class="font-medium">@Model.User?.FirstName @Model.User?.LastName</dd>
+                </div>
+                <div class="flex justify-between">
+                    <dt class="text-gray-500">Type</dt>
+                    <dd>@Model.User?.UserType</dd>
+                </div>
+                <div class="flex justify-between">
+                    <dt class="text-gray-500">ID Number</dt>
+                    <dd>@(Model.User?.UserType == "Student" ? Model.User?.StudentNumber : Model.User?.EmployeeNumber)</dd>
+                </div>
+                <div class="flex justify-between">
+                    <dt class="text-gray-500">Section</dt>
+                    <dd>@(string.IsNullOrEmpty(Model.User?.Section) ? "—" : Model.User?.Section)</dd>
+                </div>
+                <div class="flex justify-between">
+                    <dt class="text-gray-500">Email</dt>
+                    <dd class="text-gray-600 text-xs">@Model.User?.Email</dd>
+                </div>
+            </dl>
+        </div>
+
+        <!-- Book Info -->
+        <div class="bg-white rounded-2xl shadow p-6">
+            <h3 class="font-semibold text-gray-700 mb-4">Book Information</h3>
+            <dl class="space-y-2 text-sm">
+                <div class="flex justify-between">
+                    <dt class="text-gray-500">Title</dt>
+                    <dd class="font-medium text-right max-w-[200px]">@Model.Book?.Title</dd>
+                </div>
+                <div class="flex justify-between">
+                    <dt class="text-gray-500">Author</dt>
+                    <dd>@Model.Book?.Author</dd>
+                </div>
+                <div class="flex justify-between">
+                    <dt class="text-gray-500">Call No.</dt>
+                    <dd class="font-mono text-xs">@Model.Book?.CallNumber</dd>
+                </div>
+                <div class="flex justify-between">
+                    <dt class="text-gray-500">Aisle</dt>
+                    <dd>@Model.Book?.AisleLocation</dd>
+                </div>
+            </dl>
+        </div>
+
+        <!-- Transaction Timeline -->
+        <div class="col-span-2 bg-white rounded-2xl shadow p-6">
+            <h3 class="font-semibold text-gray-700 mb-4">Transaction Timeline</h3>
+            <dl class="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                    <dt class="text-gray-500 text-xs">Reserved</dt>
+                    <dd>@Model.ReservationDate.ToString("MMM dd, yyyy hh:mm tt")</dd>
+                </div>
+                @if (Model.Status != "Pending" && Model.Status != "Denied")
+                {
+                    <div>
+                        <dt class="text-gray-500 text-xs">Pickup Deadline</dt>
+                        <dd>@Model.PickupDeadline.ToString("MMM dd, yyyy hh:mm tt")</dd>
+                    </div>
+                }
+                @if (Model.ActualPickupTime.HasValue)
+                {
+                    <div>
+                        <dt class="text-gray-500 text-xs">Picked Up</dt>
+                        <dd>@Model.ActualPickupTime.Value.ToString("MMM dd, yyyy hh:mm tt")</dd>
+                    </div>
+                }
+                @if (Model.DueDate.HasValue)
+                {
+                    <div>
+                        <dt class="text-gray-500 text-xs">Due Date</dt>
+                        <dd class="@(Model.DueDate < DateTime.Now && Model.Status != "Returned" ? "text-red-600 font-semibold" : "")">
+                            @Model.DueDate.Value.ToString("MMM dd, yyyy hh:mm tt")
+                        </dd>
+                    </div>
+                }
+                @if (Model.ActualReturnDate.HasValue)
+                {
+                    <div>
+                        <dt class="text-gray-500 text-xs">Returned</dt>
+                        <dd>@Model.ActualReturnDate.Value.ToString("MMM dd, yyyy hh:mm tt")</dd>
+                    </div>
+                }
+                @if (!string.IsNullOrEmpty(Model.LibrarianRemarks))
+                {
+                    <div class="col-span-2">
+                        <dt class="text-gray-500 text-xs">Librarian Remarks</dt>
+                        <dd class="italic text-gray-600">@Model.LibrarianRemarks</dd>
+                    </div>
+                }
+            </dl>
+        </div>
+
+    </div>
+
+    <!-- Actions -->
+    <div class="mt-5 flex gap-3">
+        @if (Model.Status == "Pending")
+        {
+            <form method="post" asp-action="Approve" asp-route-id="@Model.Id">
+                <button type="submit" class="bg-green-600 text-white px-6 py-2 rounded-xl text-sm hover:bg-green-700">Approve</button>
+            </form>
+            <form method="post" asp-action="Deny" asp-route-id="@Model.Id">
+                <button type="submit" class="border border-red-300 text-red-600 px-6 py-2 rounded-xl text-sm hover:bg-red-50">Deny</button>
+            </form>
+        }
+        @if (Model.Status == "Approved")
+        {
+            <form method="post" asp-action="ConfirmPickup" asp-route-id="@Model.Id">
+                <button type="submit" class="bg-blue-600 text-white px-6 py-2 rounded-xl text-sm hover:bg-blue-700">Confirm Pickup</button>
+            </form>
+        }
+        @if (Model.Status == "PickedUp" || Model.Status == "Overdue")
+        {
+            <form method="post" asp-action="ConfirmReturn" asp-route-id="@Model.Id">
+                <button type="submit" class="bg-violet-700 text-white px-6 py-2 rounded-xl text-sm hover:bg-violet-800">Confirm Return</button>
+            </form>
+        }
+    </div>
+</div>

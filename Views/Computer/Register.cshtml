@@ -1,0 +1,68 @@
+@using BookHiveLibrary.Models
+@model ComputerUnit
+@{
+    Layout = "~/Views/Shared/_LibrarianLayout.cshtml";
+    ViewData["Title"] = "Computer Management";
+}
+
+<!-- Stats Row -->
+<div class="grid grid-cols-4 gap-4 mb-6">
+    <div class="rounded-xl p-4 text-white" style="background-color:#4a6fa5;">
+        <p class="text-xs text-blue-200 mb-1">Total Computer</p>
+        <p class="text-3xl font-bold">@ViewBag.TotalComputers</p>
+    </div>
+    <div class="rounded-xl p-4 text-white" style="background-color:#4a6fa5;">
+        <p class="text-xs text-blue-200 mb-1">Available</p>
+        <p class="text-3xl font-bold">@ViewBag.AvailableComputers</p>
+    </div>
+    <div class="rounded-xl p-4 text-white" style="background-color:#4a6fa5;">
+        <p class="text-xs text-blue-200 mb-1">In Use</p>
+        <p class="text-3xl font-bold">@ViewBag.InUseComputers</p>
+    </div>
+    <div class="rounded-xl p-4 text-white" style="background-color:#4a6fa5;">
+        <p class="text-xs text-blue-200 mb-1">Archive</p>
+        <p class="text-3xl font-bold">@ViewBag.ArchivedComputers</p>
+    </div>
+</div>
+
+<div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 max-w-lg">
+    <div class="flex items-center gap-2 mb-6">
+        <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+        <h2 class="text-lg font-semibold text-gray-700">Computer Registration</h2>
+    </div>
+
+    @if (!ViewData.ModelState.IsValid)
+    {
+        <div class="mb-4 px-4 py-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+            @foreach (var err in ViewData.ModelState.Values.SelectMany(v => v.Errors))
+            {
+                <p>@err.ErrorMessage</p>
+            }
+        </div>
+    }
+
+    <form method="post" action="@Url.Action("Register","Computer")">
+        @Html.AntiForgeryToken()
+
+        <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-600 mb-2">Computer Number:</label>
+            <input type="text" name="computerNumber" required
+                   class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" />
+        </div>
+
+        <div class="mb-6">
+            <label class="block text-sm font-medium text-gray-600 mb-2">Computer Status:</label>
+            <select name="isAvailable"
+                    class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
+                <option value="true">Available</option>
+                <option value="false">Unavailable</option>
+            </select>
+        </div>
+
+        <div class="flex justify-end gap-3">
+            <a href="@Url.Action("Index","Computer")"
+               class="px-5 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200">Cancel</a>
+            <button type="submit" class="px-5 py-2 text-white rounded-lg text-sm font-medium" style="background-color:#1e3a6e;">Register</button>
+        </div>
+    </form>
+</div>

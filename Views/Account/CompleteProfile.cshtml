@@ -1,0 +1,43 @@
+@{
+    ViewData["Title"] = "Complete Profile";
+}
+
+<div class="min-h-screen flex items-center justify-center bg-violet-700">
+
+    <div class="bg-white rounded-[40px] w-[700px] p-16 flex flex-col items-center">
+
+        <img src="/images/bookhive_logo_v2.svg" class="w-[150px] mb-3" />
+
+        <h1 class="text-4xl font-light mb-2">
+            Book<span class="text-violet-700">Hive</span>
+        </h1>
+
+        <h3 class="text-2xl mb-3">
+            Complete Your Profile
+        </h3>
+
+        <p class="text-gray-500 text-center text-base mb-8">
+            Enter your active phone number below.<br />
+            This will be used to send you book due-date reminders.
+        </p>
+
+        <form method="post"
+              asp-action="CompleteProfile"
+              class="flex flex-col items-center w-full">
+
+            <input type="text"
+                   name="phoneNumber"
+                   placeholder="Active Phone Number (09XXXXXXXXX)"
+                   required
+                   class="w-[450px] h-[60px] rounded-2xl bg-gray-100 px-6 text-xl mb-8 outline-none" />
+
+            <button type="submit"
+                    class="w-[450px] h-[65px] bg-violet-700 text-white rounded-2xl text-2xl hover:bg-violet-800 transition">
+                Send Verification Code
+            </button>
+
+        </form>
+
+    </div>
+
+</div>

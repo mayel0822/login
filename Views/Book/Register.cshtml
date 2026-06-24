@@ -1,0 +1,138 @@
+@model BookHiveLibrary.ViewModels.BookFormViewModel
+@{
+    Layout = "~/Views/Shared/_LibrarianLayout.cshtml";
+    ViewData["Title"] = "Book Registration";
+}
+
+<!-- Stats Row -->
+<div class="grid grid-cols-4 gap-4 mb-6">
+    <div class="rounded-xl p-4 text-white" style="background-color:#4a6fa5;">
+        <p class="text-xs text-blue-200 mb-1">Total Books</p>
+        <p class="text-3xl font-bold">@ViewBag.TotalBooks</p>
+    </div>
+    <div class="rounded-xl p-4 text-white" style="background-color:#4a6fa5;">
+        <p class="text-xs text-blue-200 mb-1">Available</p>
+        <p class="text-3xl font-bold">@ViewBag.AvailableBooks</p>
+    </div>
+    <div class="rounded-xl p-4 text-white" style="background-color:#4a6fa5;">
+        <p class="text-xs text-blue-200 mb-1">Borrowed</p>
+        <p class="text-3xl font-bold">@ViewBag.BorrowedBooks</p>
+    </div>
+    <div class="rounded-xl p-4 text-white" style="background-color:#4a6fa5;">
+        <p class="text-xs text-blue-200 mb-1">Archive</p>
+        <p class="text-3xl font-bold">@ViewBag.ArchivedBooks</p>
+    </div>
+</div>
+
+<div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+    <h2 class="text-lg font-semibold text-gray-700 mb-6">@(Model.Id == 0 ? "Register New Book" : "Edit Book")</h2>
+
+    <form method="post" asp-action="Register">
+        @Html.AntiForgeryToken()
+        <div asp-validation-summary="ModelOnly" class="mb-4 text-red-600 text-sm"></div>
+
+        <div class="grid grid-cols-2 gap-8">
+            <!-- Cover Image Preview -->
+            <div class="flex flex-col items-center gap-4">
+                <div id="coverPreview" class="w-48 h-64 bg-gray-100 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center overflow-hidden">
+                    @if (!string.IsNullOrEmpty(Model.CoverImageUrl))
+                    {
+                        <img id="coverImg" src="@Model.CoverImageUrl" class="w-full h-full object-cover" alt="Cover" />
+                    }
+                    else
+                    {
+                        <div id="coverPlaceholder" class="text-center text-gray-400">
+                            <svg class="w-12 h-12 mx-auto mb-2" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z"/></svg>
+                            <p class="text-xs">Cover Preview</p>
+                        </div>
+                    }
+                </div>
+                <div class="w-full">
+                    <label class="block text-sm font-medium text-gray-600 mb-1">Cover Image URL</label>
+                    <input type="text" asp-for="CoverImageUrl" id="coverUrlInput"
+                           placeholder="https://..."
+                           class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+                           oninput="updatePreview(this.value)" />
+                </div>
+                <div class="w-full">
+                    <label class="block text-sm font-medium text-gray-600 mb-1">Total Quantity</label>
+                    <input type="number" asp-for="TotalQuantity" min="1"
+                           class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" />
+                </div>
+                <div class="w-full">
+                    <label class="block text-sm font-medium text-gray-600 mb-1">Available Quantity</label>
+                    <input type="number" asp-for="AvailableQuantity" min="0"
+                           class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" />
+                </div>
+            </div>
+
+            <!-- Book Fields -->
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-600 mb-1">Book Title</label>
+                    <input type="text" asp-for="Title" required
+                           class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" />
+                    <span asp-validation-for="Title" class="text-red-500 text-xs"></span>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-600 mb-1">Author</label>
+                    <input type="text" asp-for="Author" required
+                           class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" />
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-600 mb-1">Book ID / Call No.</label>
+                        <input type="text" asp-for="CallNumber" required
+                               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" />
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-600 mb-1">Published Year</label>
+                        <input type="text" asp-for="PublishedYear" placeholder="e.g. 2023"
+                               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" />
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-600 mb-1">Category</label>
+                        <input type="text" asp-for="Category" required
+                               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" />
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-600 mb-1">Location / Aisle</label>
+                        <input type="text" asp-for="AisleLocation" required
+                               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" />
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-600 mb-1">Grade Level</label>
+                    <input type="text" asp-for="GradeLevel" placeholder="e.g. Grade 10, College"
+                           class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-600 mb-1">Book Synopsis</label>
+                    <textarea asp-for="Description" rows="4"
+                              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 resize-none"></textarea>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex gap-3 mt-6">
+            <button type="submit" class="px-6 py-2 text-white rounded-lg text-sm font-medium" style="background-color:#1e3a6e;">
+                @(Model.Id == 0 ? "Register Book" : "Save Changes")
+            </button>
+            <a href="@Url.Action("Index","Book")" class="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200">Cancel</a>
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+<script>
+function updatePreview(url) {
+    const preview = document.getElementById('coverPreview');
+    const placeholder = document.getElementById('coverPlaceholder');
+    if (url) {
+        preview.innerHTML = '<img src="' + url + '" class="w-full h-full object-cover" onerror="this.style.display=\'none\'" />';
+    }
+}
+</script>
+}

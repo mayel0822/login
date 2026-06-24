@@ -1,0 +1,192 @@
+using BookHiveLibrary.Data;
+using BookHiveLibrary.Models;
+using BookHiveLibrary.ViewModels;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using QRCoder;
+
+namespace BookHiveLibrary.Controllers
+{
+    public class BookController : Controller
+    {
+        private readonly ApplicationDbContext _context;
+
+        public BookController(ApplicationDbContext context)
+        {
+            _context = context;
+        }
+
+        // Library Catalog
+        public async Task<IActionResult> Index(string? search, string? category)
+        {
+            var query = _context.Books.Where(b => !b.IsArchived);
+
+            if (!string.IsNullOrWhiteSpace(search))
+                query = query.Where(b =>
+                    b.Title.Contains(search) ||
+                    b.Author.Contains(search) ||
+                    b.CallNumber.Contains(search));
+
+            if (!string.IsNullOrWhiteSpace(category))
+                query = query.Where(b => b.Category == category);
+
+            var books = await query.OrderBy(b => b.Title).ToListAsync();
+
+            ViewBag.Search = search;
+            ViewBag.Category = category;
+            ViewBag.Categories = await _context.Books
+                .Where(b => !b.IsArchived)
+                .Select(b => b.Category)
+                .Distinct()
+                .OrderBy(c => c)
+                .ToListAsync();
+
+            return View(books);
+        }
+
+        // Register / Add Book
+        public async Task<IActionResult> Register()
+        {
+            ViewBag.TotalBooks = await _context.Books.SumAsync(b => (int?)b.TotalQuantity) ?? 0;
+            ViewBag.AvailableBooks = await _context.Books.Where(b => !b.IsArchived).SumAsync(b => (int?)b.AvailableQuantity) ?? 0;
+            ViewBag.BorrowedBooks = await _context.BookReservations.CountAsync(r => r.Status == "PickedUp");
+            ViewBag.ArchivedBooks = await _context.Books.CountAsync(b => b.IsArchived);
+            return View(new BookFormViewModel());
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> Register(BookFormViewModel model)
+        {
+            if (!ModelState.IsValid) return View(model);
+
+            _context.Books.Add(new Book
+            {
+                Title = model.Title,
+                Author = model.Author,
+                Category = model.Category,
+                GradeLevel = model.GradeLevel,
+                CallNumber = model.CallNumber,
+                AisleLocation = model.AisleLocation,
+                Description = model.Description,
+                CoverImageUrl = model.CoverImageUrl,
+                PublishedYear = model.PublishedYear,
+                TotalQuantity = model.TotalQuantity,
+                AvailableQuantity = model.AvailableQuantity
+            });
+
+            await _context.SaveChangesAsync();
+            TempData["Success"] = "Book registered successfully.";
+            return RedirectToAction("Index");
+        }
+
+        // Edit Book
+        public async Task<IActionResult> Edit(int id)
+        {
+            var book = await _context.Books.FindAsync(id);
+            if (book == null) return NotFound();
+
+            return View(new BookFormViewModel
+            {
+                Id = book.Id,
+                Title = book.Title,
+                Author = book.Author,
+                Category = book.Category,
+                GradeLevel = book.GradeLevel,
+                CallNumber = book.CallNumber,
+                AisleLocation = book.AisleLocation,
+                Description = book.Description,
+                CoverImageUrl = book.CoverImageUrl,
+                PublishedYear = book.PublishedYear,
+                TotalQuantity = book.TotalQuantity,
+                AvailableQuantity = book.AvailableQuantity
+            });
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> Edit(BookFormViewModel model)
+        {
+            if (!ModelState.IsValid) return View(model);
+
+            var book = await _context.Books.FindAsync(model.Id);
+            if (book == null) return NotFound();
+
+            book.Title = model.Title;
+            book.Author = model.Author;
+            book.Category = model.Category;
+            book.GradeLevel = model.GradeLevel;
+            book.CallNumber = model.CallNumber;
+            book.AisleLocation = model.AisleLocation;
+            book.Description = model.Description;
+            book.CoverImageUrl = model.CoverImageUrl;
+            book.PublishedYear = model.PublishedYear;
+            book.TotalQuantity = model.TotalQuantity;
+            book.AvailableQuantity = model.AvailableQuantity;
+
+            await _context.SaveChangesAsync();
+            TempData["Success"] = "Book updated successfully.";
+            return RedirectToAction("Index");
+        }
+
+        // Archive Book
+        [HttpPost]
+        public async Task<IActionResult> Archive(int id, string reason)
+        {
+            var book = await _context.Books.FindAsync(id);
+            if (book == null) return NotFound();
+
+            book.IsArchived = true;
+            book.ArchiveReason = reason;
+            book.AvailableQuantity = 0;
+
+            await _context.SaveChangesAsync();
+            TempData["Success"] = "Book archived.";
+            return RedirectToAction("Index");
+        }
+
+        // Archived Books List
+        public async Task<IActionResult> Archive()
+        {
+            ViewBag.TotalBooks = await _context.Books.SumAsync(b => (int?)b.TotalQuantity) ?? 0;
+            ViewBag.AvailableBooks = await _context.Books.Where(b => !b.IsArchived).SumAsync(b => (int?)b.AvailableQuantity) ?? 0;
+            ViewBag.BorrowedBooks = await _context.BookReservations.CountAsync(r => r.Status == "PickedUp");
+            ViewBag.ArchivedBooks = await _context.Books.CountAsync(b => b.IsArchived);
+
+            var archived = await _context.Books
+                .Where(b => b.IsArchived)
+                .OrderByDescending(b => b.CreatedAt)
+                .ToListAsync();
+            return View(archived);
+        }
+
+        // QR Code image for shelf location
+        public async Task<IActionResult> QRCode(int id)
+        {
+            var book = await _context.Books.FindAsync(id);
+            if (book == null) return NotFound();
+
+            string content = $"BookHive\nTitle: {book.Title}\nCall No: {book.CallNumber}\nAisle: {book.AisleLocation}";
+
+            using var qrGenerator = new QRCodeGenerator();
+            var qrData = qrGenerator.CreateQrCode(content, QRCodeGenerator.ECCLevel.Q);
+            using var qrCode = new PngByteQRCode(qrData);
+            byte[] png = qrCode.GetGraphic(6);
+
+            return File(png, "image/png");
+        }
+
+        // Restore from Archive
+        [HttpPost]
+        public async Task<IActionResult> Restore(int id)
+        {
+            var book = await _context.Books.FindAsync(id);
+            if (book == null) return NotFound();
+
+            book.IsArchived = false;
+            book.ArchiveReason = "";
+
+            await _context.SaveChangesAsync();
+            TempData["Success"] = "Book restored.";
+            return RedirectToAction("Archive");
+        }
+    }
+}

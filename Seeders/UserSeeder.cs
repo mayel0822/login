@@ -1,0 +1,84 @@
+﻿using BookHiveLibrary.Models;
+using Microsoft.AspNetCore.Identity;
+
+namespace BookHiveLibrary.Seeders
+{
+    public static class UserSeeder
+    {
+        public static async Task SeedUsersAsync(
+            UserManager<ApplicationUser> userManager)
+        {
+            await CreateUser(
+            userManager,
+
+
+            "misadmin",
+            "MisBookHive@gmail.com",
+            "MisBookHivePassword@123",
+            "MIS");
+
+            await CreateUser(
+                userManager,
+                "librarian1",
+                "librarian@bookhive.com",
+                "LibrarianPassword@123",
+                "Librarian");
+
+            await CreateUser(
+                userManager,
+                "professor1",
+                "professor@bookhive.com",
+                "ProfessorPassword@123",
+                "Professor");
+
+            await CreateUser(
+                userManager,
+                "student1",
+                "Rebisco2023@outlook.com",
+                "StudentPassword@123",
+                "Student");
+        }
+
+        private static async Task CreateUser(
+        UserManager<ApplicationUser> userManager,
+        string username,
+        string email,
+        string password,
+        string role)
+        {
+            var user = await userManager.FindByEmailAsync(email);
+
+            if (user == null)
+            {
+                user = new ApplicationUser
+                {
+                    UserName = username,
+                    Email = email,
+                    UserType = role,
+                    EmailConfirmed = true,
+                    IsFirstLogin = false
+                };
+
+                Console.WriteLine($"Creating {role}: {email}");
+
+                var result = await userManager.CreateAsync(user, password);
+
+                if (result.Succeeded)
+                {
+                    Console.WriteLine($"{role} created successfully.");
+
+                    await userManager.AddToRoleAsync(user, role);
+                }
+                else
+                {
+                    Console.WriteLine($"{role} creation failed.");
+
+                    foreach (var error in result.Errors)
+                    {
+                        Console.WriteLine(error.Code + " : " + error.Description);
+                    }
+                }
+            }
+        }
+    }
+}

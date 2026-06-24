@@ -1,0 +1,70 @@
+﻿body {
+    margin: 0;
+    background: linear-gradient(135deg,#4f46e5,#6d28d9);
+    height: 100vh;
+}
+
+.login-background {
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.login-card {
+    width: 800px;
+    background: white;
+    border-radius: 70px;
+    padding: 80px;
+    box-shadow: 0 10px 30px rgba(0,0,0,.2);
+    text-align: center;
+}
+
+.book-logo {
+    font-size: 90px;
+}
+
+.bookhive-title {
+    font-size: 65px;
+    margin-bottom: 10px;
+}
+
+    .bookhive-title span {
+        color: #6d28d9;
+    }
+
+.textbox {
+    width: 80%;
+    padding: 18px;
+    border: none;
+    border-radius: 15px;
+    background: #f3f3f3;
+    margin-bottom: 20px;
+    font-size: 20px;
+}
+
+.login-btn {
+    width: 85%;
+    padding: 18px;
+    border: none;
+    border-radius: 15px;
+    margin-bottom: 20px;
+    margin-top: 20px;
+    background: #6d28d9;
+    color: white;
+    font-size: 22px;
+    cursor: pointer;
+}
+
+    .login-btn:hover {
+        background: #5b21b6;
+    }
+
+.back-btn {
+    display: block;
+    margin-top: 20px;
+    text-decoration: none;
+    color: #6d28d9;
+    font-size: 18px;
+    text-align: right;
+}

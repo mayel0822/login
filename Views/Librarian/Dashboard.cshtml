@@ -1,0 +1,136 @@
+@using BookHiveLibrary.Models
+@{
+    Layout = "~/Views/Shared/_LibrarianLayout.cshtml";
+    ViewData["Title"] = "Dashboard";
+}
+
+<!-- Stat Cards -->
+<div class="grid grid-cols-5 gap-4 mb-6">
+    <div class="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+        <p class="text-xs text-gray-500 mb-1">Active Users</p>
+        <p class="text-3xl font-bold text-gray-800">@ViewBag.ActiveUsers</p>
+    </div>
+    <div class="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+        <p class="text-xs text-gray-500 mb-1">Book Borrowed</p>
+        <p class="text-3xl font-bold text-gray-800">@ViewBag.BookBorrowed</p>
+    </div>
+    <div class="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+        <p class="text-xs text-gray-500 mb-1">Reservation</p>
+        <p class="text-3xl font-bold text-gray-800">@ViewBag.Reservations</p>
+    </div>
+    <div class="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+        <p class="text-xs text-gray-500 mb-1">Computer In Use</p>
+        <p class="text-3xl font-bold text-gray-800">@ViewBag.ComputerInUse</p>
+    </div>
+    <div class="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+        <p class="text-xs text-gray-500 mb-1">Available</p>
+        <p class="text-3xl font-bold text-gray-800">@ViewBag.ComputerAvailable</p>
+    </div>
+</div>
+
+<div class="grid grid-cols-3 gap-4">
+    <!-- Current Borrowers Table -->
+    <div class="col-span-2 bg-white rounded-xl shadow-sm border border-gray-100">
+        <div class="px-5 py-4 border-b border-gray-100">
+            <h2 class="font-semibold text-gray-700">Current Borrowers</h2>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead class="bg-gray-50 text-gray-500 text-xs uppercase">
+                    <tr>
+                        <th class="px-4 py-3 text-left">Date</th>
+                        <th class="px-4 py-3 text-left">Name</th>
+                        <th class="px-4 py-3 text-left">Book Title</th>
+                        <th class="px-4 py-3 text-left">Due Date</th>
+                        <th class="px-4 py-3 text-left">Status</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    @if (ViewBag.CurrentBorrowers != null)
+                    {
+                        foreach (var r in (List<BookReservation>)ViewBag.CurrentBorrowers)
+                        {
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-4 py-3 text-gray-600">@r.CreatedAt.ToString("MM/dd/yyyy")</td>
+                                <td class="px-4 py-3 font-medium text-gray-800">@r.User?.FirstName @r.User?.LastName</td>
+                                <td class="px-4 py-3 text-gray-600">@r.Book?.Title</td>
+                                <td class="px-4 py-3 text-gray-600">@r.DueDate?.ToString("MM/dd/yyyy")</td>
+                                <td class="px-4 py-3">
+                                    @if (r.Status == "Overdue")
+                                    {
+                                        <span class="px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs font-medium">Overdue</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">Active</span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    }
+                    @if (ViewBag.CurrentBorrowers == null || ((List<BookReservation>)ViewBag.CurrentBorrowers).Count == 0)
+                    {
+                        <tr><td colspan="5" class="px-4 py-8 text-center text-gray-400 text-sm">No active borrowers</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Right panels -->
+    <div class="space-y-4">
+        <!-- Reservation List -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100">
+            <div class="px-5 py-4 border-b border-gray-100">
+                <h2 class="font-semibold text-gray-700">Reservation List</h2>
+            </div>
+            <div class="px-5 py-3 space-y-3 max-h-52 overflow-y-auto">
+                @if (ViewBag.ReservationList != null)
+                {
+                    foreach (var r in (List<BookReservation>)ViewBag.ReservationList)
+                    {
+                        <div class="flex items-start gap-3">
+                            <div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 text-xs font-bold flex-shrink-0">
+                                @r.User?.FirstName?.FirstOrDefault()
+                            </div>
+                            <div>
+                                <p class="text-sm font-medium text-gray-800">@r.User?.FirstName @r.User?.LastName</p>
+                                <p class="text-xs text-gray-500">@r.Book?.Title</p>
+                            </div>
+                        </div>
+                    }
+                }
+                @if (ViewBag.ReservationList == null || ((List<BookReservation>)ViewBag.ReservationList).Count == 0)
+                {
+                    <p class="text-sm text-gray-400 text-center py-4">No pending reservations</p>
+                }
+            </div>
+        </div>
+
+        <!-- Book Dues -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100">
+            <div class="px-5 py-4 border-b border-gray-100">
+                <h2 class="font-semibold text-gray-700">Book Dues</h2>
+            </div>
+            <div class="px-5 py-3 space-y-3 max-h-52 overflow-y-auto">
+                @if (ViewBag.BookDues != null)
+                {
+                    foreach (var r in (List<BookReservation>)ViewBag.BookDues)
+                    {
+                        <div class="flex items-center gap-3">
+                            <div class="flex-1 min-w-0">
+                                <p class="text-sm font-medium text-gray-800 truncate">@r.Book?.Title</p>
+                                <p class="text-xs text-gray-500">@r.User?.FirstName @r.User?.LastName &bull; Due @r.DueDate?.ToString("MM/dd")</p>
+                            </div>
+                            <span class="px-2 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs flex-shrink-0">Due Soon</span>
+                        </div>
+                    }
+                }
+                @if (ViewBag.BookDues == null || ((List<BookReservation>)ViewBag.BookDues).Count == 0)
+                {
+                    <p class="text-sm text-gray-400 text-center py-4">No upcoming dues</p>
+                }
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,220 @@
+@using BookHiveLibrary.Models
+@model IEnumerable<BookReservation>
+@{
+    Layout = "~/Views/Shared/_LibrarianLayout.cshtml";
+    ViewData["Title"] = "Transaction Management - Book";
+    var pending = ViewBag.PendingReservations as List<BookReservation> ?? new List<BookReservation>();
+    var booksDue = ViewBag.BooksDue as List<BookReservation> ?? new List<BookReservation>();
+}
+
+<div class="grid grid-cols-3 gap-4 mb-6">
+    <!-- Pending Reservations Panel -->
+    <div class="col-span-1 bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col" style="max-height:420px;">
+        <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
+            <h2 class="font-semibold text-gray-700">Pending Reservations</h2>
+            <span class="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">@pending.Count</span>
+        </div>
+        <div class="flex-1 overflow-y-auto divide-y divide-gray-100">
+            @if (!pending.Any())
+            {
+                <p class="px-5 py-8 text-center text-gray-400 text-sm">No pending reservations</p>
+            }
+            @foreach (var r in pending)
+            {
+                <div class="px-4 py-3">
+                    <div class="flex items-start gap-3">
+                        <div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 text-xs font-bold flex-shrink-0">
+                            @r.User?.FirstName?.FirstOrDefault()
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <p class="text-sm font-medium text-gray-800 truncate">@r.User?.FirstName @r.User?.LastName</p>
+                            <p class="text-xs text-gray-500 truncate">@r.Book?.Title</p>
+                            <p class="text-xs text-gray-400">@r.CreatedAt.ToString("MMM dd, hh:mm tt")</p>
+                        </div>
+                    </div>
+                    <div class="flex gap-2 mt-2 ml-11">
+                        <form method="post" action="@Url.Action("Deny","Borrow")" class="flex gap-1">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="id" value="@r.Id" />
+                            <button type="submit" class="px-3 py-1 text-xs border border-red-300 text-red-600 rounded hover:bg-red-50">Deny</button>
+                        </form>
+                        <form method="post" action="@Url.Action("Approve","Borrow")">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="id" value="@r.Id" />
+                            <button type="submit" class="px-3 py-1 text-xs text-white rounded" style="background-color:#1e3a6e;">Grant</button>
+                        </form>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- Books Due Panel -->
+    <div class="col-span-2 bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col" style="max-height:420px;">
+        <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
+            <div class="flex items-center gap-3">
+                <h2 class="font-semibold text-gray-700">Books Due</h2>
+                <span class="px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded-full text-xs font-medium">@ViewBag.BooksDueCount</span>
+            </div>
+            <button class="px-3 py-1.5 text-xs text-white rounded" style="background-color:#1e3a6e;">Send Reminder</button>
+        </div>
+        <div class="flex-1 overflow-y-auto">
+            <table class="w-full text-sm">
+                <thead class="bg-gray-50 text-gray-500 text-xs uppercase sticky top-0">
+                    <tr>
+                        <th class="px-4 py-3 text-left">Date</th>
+                        <th class="px-4 py-3 text-left">Book Title</th>
+                        <th class="px-4 py-3 text-left">Borrower</th>
+                        <th class="px-4 py-3 text-left">Due Date</th>
+                        <th class="px-4 py-3 text-left">Status</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    @foreach (var r in booksDue)
+                    {
+                        var isOverdue = r.DueDate < DateTime.Now;
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-4 py-3 text-gray-500 text-xs">@r.CreatedAt.ToString("MM/dd/yyyy")</td>
+                            <td class="px-4 py-3 font-medium text-gray-800">@r.Book?.Title</td>
+                            <td class="px-4 py-3 text-gray-600">@r.User?.FirstName @r.User?.LastName</td>
+                            <td class="px-4 py-3 text-gray-600">@r.DueDate?.ToString("MM/dd/yyyy")</td>
+                            <td class="px-4 py-3">
+                                @if (isOverdue)
+                                {
+                                    <span class="px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs">Overdue</span>
+                                }
+                                else
+                                {
+                                    <span class="px-2 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs">Due Soon</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                    @if (!booksDue.Any())
+                    {
+                        <tr><td colspan="5" class="px-4 py-8 text-center text-gray-400">No books due soon</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Borrowed Books Table -->
+<div class="bg-white rounded-xl shadow-sm border border-gray-100">
+    <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+        <h2 class="font-semibold text-gray-700">Borrowed Books</h2>
+        <button onclick="document.getElementById('borrowModal').classList.remove('hidden')"
+                class="px-4 py-2 text-sm text-white rounded-lg" style="background-color:#1e3a6e;">+ Borrow Book</button>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+            <thead class="bg-gray-50 text-gray-500 text-xs uppercase">
+                <tr>
+                    <th class="px-4 py-3 text-left">Stud ID</th>
+                    <th class="px-4 py-3 text-left">Name</th>
+                    <th class="px-4 py-3 text-left">Level</th>
+                    <th class="px-4 py-3 text-left">Course</th>
+                    <th class="px-4 py-3 text-left">Section</th>
+                    <th class="px-4 py-3 text-left">Book Title</th>
+                    <th class="px-4 py-3 text-left">Borrow Date</th>
+                    <th class="px-4 py-3 text-left">Due Date</th>
+                    <th class="px-4 py-3 text-left">Status</th>
+                    <th class="px-4 py-3 text-left">Action</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                @foreach (var r in Model)
+                {
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-4 py-3 text-gray-600 text-xs">@r.User?.StudentNumber</td>
+                        <td class="px-4 py-3 font-medium text-gray-800">@r.User?.FirstName @r.User?.LastName</td>
+                        <td class="px-4 py-3 text-gray-600">@r.User?.Level</td>
+                        <td class="px-4 py-3 text-gray-600">@r.User?.Course</td>
+                        <td class="px-4 py-3 text-gray-600">@r.User?.Section</td>
+                        <td class="px-4 py-3 text-gray-700">@r.Book?.Title</td>
+                        <td class="px-4 py-3 text-gray-500 text-xs">@r.ActualPickupTime?.ToString("MM/dd/yyyy")</td>
+                        <td class="px-4 py-3 text-gray-500 text-xs">@r.DueDate?.ToString("MM/dd/yyyy")</td>
+                        <td class="px-4 py-3">
+                            @{
+                                var badgeClass = r.Status switch {
+                                    "Overdue" => "bg-red-100 text-red-700",
+                                    "PickedUp" => "bg-green-100 text-green-700",
+                                    "Approved" => "bg-blue-100 text-blue-700",
+                                    _ => "bg-gray-100 text-gray-600"
+                                };
+                                var label = r.Status == "PickedUp" ? "Active" : r.Status;
+                            }
+                            <span class="px-2 py-1 rounded-full text-xs font-medium @badgeClass">@label</span>
+                        </td>
+                        <td class="px-4 py-3">
+                            @if (r.Status == "Approved")
+                            {
+                                <form method="post" action="@Url.Action("ConfirmPickup","Borrow")" class="inline">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="id" value="@r.Id" />
+                                    <button type="submit" class="text-xs px-3 py-1.5 text-white rounded" style="background-color:#1e3a6e;">Pickup</button>
+                                </form>
+                            }
+                            else if (r.Status == "PickedUp" || r.Status == "Overdue")
+                            {
+                                <form method="post" action="@Url.Action("ConfirmReturn","Borrow")" class="inline">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="id" value="@r.Id" />
+                                    <button type="submit" class="text-xs px-3 py-1.5 border border-gray-300 text-gray-600 rounded hover:bg-gray-50">Return</button>
+                                </form>
+                            }
+                        </td>
+                    </tr>
+                }
+                @if (!Model.Any())
+                {
+                    <tr><td colspan="10" class="px-4 py-8 text-center text-gray-400">No borrowed books yet. Use <strong>+ Borrow Book</strong> to record a walk-up borrow.</td></tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Borrow Book Modal -->
+<div id="borrowModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden">
+    <div class="bg-white rounded-xl p-6 w-[480px] shadow-xl">
+        <h3 class="text-lg font-semibold text-gray-800 mb-5">Borrow Book</h3>
+        <form method="post" action="@Url.Action("CreateBorrow","Borrow")">
+            @Html.AntiForgeryToken()
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-600 mb-1">Student / User</label>
+                <select name="userId" required
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
+                    <option value="">Select user...</option>
+                    @if (ViewBag.Students != null)
+                    {
+                        foreach (var u in (List<BookHiveLibrary.Models.ApplicationUser>)ViewBag.Students)
+                        {
+                            <option value="@u.Id">@u.LastName, @u.FirstName (@(u.UserType == "Student" ? u.StudentNumber : u.EmployeeNumber))</option>
+                        }
+                    }
+                </select>
+            </div>
+            <div class="mb-6">
+                <label class="block text-sm font-medium text-gray-600 mb-1">Book</label>
+                <select name="bookId" required
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
+                    <option value="">Select book...</option>
+                    @if (ViewBag.AvailableBooks != null)
+                    {
+                        foreach (var b in (List<BookHiveLibrary.Models.Book>)ViewBag.AvailableBooks)
+                        {
+                            <option value="@b.Id">@b.Title — @b.Author (@b.AvailableQuantity available)</option>
+                        }
+                    }
+                </select>
+            </div>
+            <div class="flex gap-3">
+                <button type="submit" class="flex-1 py-2 text-white rounded-lg text-sm font-medium" style="background-color:#1e3a6e;">Confirm Borrow</button>
+                <button type="button" onclick="document.getElementById('borrowModal').classList.add('hidden')"
+                        class="flex-1 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>

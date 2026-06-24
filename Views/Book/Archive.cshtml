@@ -1,0 +1,72 @@
+@using BookHiveLibrary.Models
+@model IEnumerable<Book>
+@{
+    Layout = "~/Views/Shared/_LibrarianLayout.cshtml";
+    ViewData["Title"] = "Book Management";
+}
+
+<!-- Stats Row -->
+<div class="grid grid-cols-4 gap-4 mb-6">
+    <div class="rounded-xl p-4 text-white" style="background-color:#4a6fa5;">
+        <p class="text-xs text-blue-200 mb-1">Total Books</p>
+        <p class="text-3xl font-bold">@ViewBag.TotalBooks</p>
+    </div>
+    <div class="rounded-xl p-4 text-white" style="background-color:#4a6fa5;">
+        <p class="text-xs text-blue-200 mb-1">Available</p>
+        <p class="text-3xl font-bold">@ViewBag.AvailableBooks</p>
+    </div>
+    <div class="rounded-xl p-4 text-white" style="background-color:#4a6fa5;">
+        <p class="text-xs text-blue-200 mb-1">Borrowed</p>
+        <p class="text-3xl font-bold">@ViewBag.BorrowedBooks</p>
+    </div>
+    <div class="rounded-xl p-4 text-white" style="background-color:#4a6fa5;">
+        <p class="text-xs text-blue-200 mb-1">Archive</p>
+        <p class="text-3xl font-bold">@ViewBag.ArchivedBooks</p>
+    </div>
+</div>
+
+<div class="bg-white rounded-xl shadow-sm border border-gray-100">
+    <div class="px-5 py-4 border-b border-gray-100 flex items-center gap-2">
+        <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/></svg>
+        <h2 class="font-bold text-gray-700">Book Archive</h2>
+    </div>
+
+    <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+            <thead style="background-color:#1e3a6e;" class="text-white">
+                <tr>
+                    <th class="px-5 py-3 text-left font-semibold">BookID</th>
+                    <th class="px-5 py-3 text-left font-semibold">BookTitle</th>
+                    <th class="px-5 py-3 text-left font-semibold">Author</th>
+                    <th class="px-5 py-3 text-left font-semibold">Published Year</th>
+                    <th class="px-5 py-3 text-left font-semibold">Reason</th>
+                    <th class="px-5 py-3 text-left font-semibold">Action</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                @foreach (var book in Model)
+                {
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-5 py-3 text-gray-600 font-mono text-xs">@book.CallNumber</td>
+                        <td class="px-5 py-3 font-medium text-gray-800">@book.Title</td>
+                        <td class="px-5 py-3 text-gray-600">@book.Author</td>
+                        <td class="px-5 py-3 text-gray-600">@book.PublishedYear</td>
+                        <td class="px-5 py-3 text-gray-500 text-xs">@book.ArchiveReason</td>
+                        <td class="px-5 py-3">
+                            <form method="post" action="@Url.Action("Restore","Book")">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="id" value="@book.Id" />
+                                <button type="submit"
+                                        class="px-3 py-1.5 bg-green-500 text-white rounded text-xs hover:bg-green-600">Restore</button>
+                            </form>
+                        </td>
+                    </tr>
+                }
+                @if (!Model.Any())
+                {
+                    <tr><td colspan="6" class="px-5 py-10 text-center text-gray-400">No archived books</td></tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

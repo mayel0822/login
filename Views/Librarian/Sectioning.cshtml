@@ -1,0 +1,89 @@
+@using BookHiveLibrary.Models
+@{
+    Layout = "~/Views/Shared/_LibrarianLayout.cshtml";
+    ViewData["Title"] = "Sectioning";
+    var sections = ViewBag.Sections as List<Section> ?? new List<Section>();
+}
+
+<div class="grid grid-cols-2 gap-6">
+    <!-- Left: Create Section Form -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <h2 class="text-lg font-semibold text-gray-700 mb-5">Add Section</h2>
+        <form method="post" action="@Url.Action("CreateSection","Librarian")">
+            @Html.AntiForgeryToken()
+
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-600 mb-1">Level</label>
+                <select name="level" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
+                    <option value="">Select level...</option>
+                    <option value="SHS">SHS</option>
+                    <option value="College">College</option>
+                    <option value="Grade 7">Grade 7</option>
+                    <option value="Grade 8">Grade 8</option>
+                    <option value="Grade 9">Grade 9</option>
+                    <option value="Grade 10">Grade 10</option>
+                </select>
+            </div>
+
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-600 mb-1">Course / Strand</label>
+                <input type="text" name="course" required placeholder="e.g. STEM, ABM, BSIT..."
+                       class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" />
+            </div>
+
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-600 mb-1">Year</label>
+                <select name="year" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
+                    <option value="">Select year...</option>
+                    <option value="1st Year">1st Year</option>
+                    <option value="2nd Year">2nd Year</option>
+                    <option value="3rd Year">3rd Year</option>
+                    <option value="4th Year">4th Year</option>
+                    <option value="Grade 11">Grade 11</option>
+                    <option value="Grade 12">Grade 12</option>
+                </select>
+            </div>
+
+            <div class="mb-6">
+                <label class="block text-sm font-medium text-gray-600 mb-1">Section Name</label>
+                <input type="text" name="sectionName" required placeholder="e.g. Section A, Dahlia..."
+                       class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" />
+            </div>
+
+            <div class="flex gap-3">
+                <button type="submit" class="px-6 py-2 text-white rounded-lg text-sm font-medium" style="background-color:#1e3a6e;">Save</button>
+                <button type="reset" class="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200">Cancel</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Right: Sections List -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100">
+        <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+            <h2 class="font-semibold text-gray-700">Sections (@sections.Count)</h2>
+        </div>
+        <div class="divide-y divide-gray-100 max-h-[calc(100vh-16rem)] overflow-y-auto">
+            @if (!sections.Any())
+            {
+                <p class="px-5 py-8 text-center text-gray-400 text-sm">No sections created yet</p>
+            }
+            @foreach (var s in sections)
+            {
+                <div class="flex items-center justify-between px-5 py-3 hover:bg-gray-50">
+                    <div>
+                        <p class="text-sm font-medium text-gray-800">@s.SectionName</p>
+                        <p class="text-xs text-gray-500">@s.Level &bull; @s.Course &bull; @s.Year</p>
+                    </div>
+                    <form method="post" action="@Url.Action("DeleteSection","Librarian")"
+                          onsubmit="return confirm('Delete this section?')">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="id" value="@s.Id" />
+                        <button type="submit" class="text-red-400 hover:text-red-600">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                        </button>
+                    </form>
+                </div>
+            }
+        </div>
+    </div>
+</div>

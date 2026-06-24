@@ -1,0 +1,471 @@
+using BookHiveLibrary.Data;
+using BookHiveLibrary.Models;
+using BookHiveLibrary.Services;
+using BookHiveLibrary.ViewModels;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
+using System.Security.Cryptography;
+
+namespace BookHiveLibrary.Controllers
+{
+    public class AccountController : Controller
+    {
+        private readonly UserManager<ApplicationUser> _userManager;
+        private readonly SignInManager<ApplicationUser> _signInManager;
+        private readonly ApplicationDbContext _context;
+        private readonly EmailService _emailService;
+        private readonly SmsService _smsService;
+
+        public AccountController(
+            UserManager<ApplicationUser> userManager,
+            SignInManager<ApplicationUser> signInManager,
+            ApplicationDbContext context,
+            EmailService emailService,
+            SmsService smsService)
+        {
+            _userManager = userManager;
+            _signInManager = signInManager;
+            _context = context;
+            _emailService = emailService;
+            _smsService = smsService;
+        }
+
+        public IActionResult Login()
+        {
+            return View();
+        }
+
+        public IActionResult AdminLogin()
+        {
+            return View();
+        }
+
+        public IActionResult VerifyOtp()
+        {
+            var model = new VerifyOtpViewModel
+            {
+                Email = TempData["Email"]?.ToString() ?? ""
+            };
+
+            TempData.Keep("Email");
+            TempData.Keep("AccountEmail");
+            TempData.Keep("PendingOutlookEmail");
+
+            return View(model);
+        }
+
+        public IActionResult CompleteProfile()
+        {
+            TempData.Keep("Email");
+            return View();
+        }
+
+        public IActionResult VerifyPhoneOtp()
+        {
+            var model = new VerifyPhoneOtpViewModel
+            {
+                Email = TempData["Email"]?.ToString() ?? ""
+            };
+
+            TempData.Keep("Email");
+
+            return View(model);
+        }
+
+        // ── Microsoft OAuth ──────────────────────────────────────────────────
+
+        public IActionResult MicrosoftLogin()
+        {
+            var redirectUrl = Url.Action("MicrosoftLoginCallback", "Account");
+            var properties = _signInManager.ConfigureExternalAuthenticationProperties(
+                "Microsoft", redirectUrl);
+
+            // Force Microsoft to always show the login prompt
+            properties.Parameters["prompt"] = "login";
+
+            return Challenge(properties, "Microsoft");
+        }
+
+        public async Task<IActionResult> MicrosoftLoginCallback()
+        {
+            var info = await _signInManager.GetExternalLoginInfoAsync();
+            if (info == null)
+            {
+                TempData["Error"] = "Microsoft login failed. Please try again.";
+                return RedirectToAction("Login");
+            }
+
+            var email = info.Principal.FindFirstValue(ClaimTypes.Email)
+                     ?? info.Principal.FindFirstValue("preferred_username");
+
+            if (string.IsNullOrEmpty(email))
+            {
+                TempData["Error"] = "Could not retrieve email from Microsoft account.";
+                return RedirectToAction("Login");
+            }
+
+            var user = await _userManager.FindByEmailAsync(email);
+            if (user == null)
+            {
+                TempData["Error"] = "No account found for this Microsoft email. Contact your administrator.";
+                return RedirectToAction("Login");
+            }
+
+            if (!user.IsActive)
+            {
+                TempData["Error"] = "Your account has been deactivated.";
+                return RedirectToAction("Login");
+            }
+
+            // Librarian and MIS: Microsoft already handled MFA — sign in directly
+            if (user.UserType == "Librarian" || user.UserType == "MIS")
+            {
+                await _signInManager.SignInAsync(user, isPersistent: false);
+                return RedirectToDashboard(user.UserType);
+            }
+
+            // Students and Professors: send email OTP as second factor
+            string otpCode = GenerateOtp();
+            _context.OtpVerifications.Add(new OtpVerification
+            {
+                Email = user.Email!,
+                Code = otpCode,
+                ExpirationTime = DateTime.Now.AddMinutes(5),
+                IsUsed = false
+            });
+            await _context.SaveChangesAsync();
+
+            try
+            {
+                await _emailService.SendOtpAsync(user.Email!, otpCode);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[EMAIL ERROR] {ex.Message}");
+                Console.WriteLine($"[DEV OTP] {user.Email} → {otpCode}");
+            }
+
+            TempData["Email"] = user.Email;
+            return RedirectToAction("VerifyOtp");
+        }
+
+        // ── Admin (password) Login ───────────────────────────────────────────
+
+        [HttpPost]
+        public async Task<IActionResult> AdminLogin(LoginViewModel model)
+        {
+            ModelState.Remove("OutlookEmail");
+            if (!ModelState.IsValid)
+                return View(model);
+
+            ApplicationUser? user;
+
+            if (model.EmailOrUsername.Contains("@"))
+                user = await _userManager.FindByEmailAsync(model.EmailOrUsername);
+            else
+                user = await _userManager.FindByNameAsync(model.EmailOrUsername);
+
+            if (user == null)
+            {
+                ModelState.AddModelError("", "User not found.");
+                return View(model);
+            }
+
+            if (user.UserType != "Librarian")
+            {
+                ModelState.AddModelError("", "This login is for Librarian accounts only.");
+                return View(model);
+            }
+
+            var passwordCheck = await _userManager.CheckPasswordAsync(user, model.Password);
+            if (!passwordCheck)
+            {
+                ModelState.AddModelError("", "Password incorrect.");
+                return View(model);
+            }
+
+            // Determine which Outlook email to use
+            string outlookEmail = user.OutlookEmail;
+
+            if (string.IsNullOrEmpty(outlookEmail))
+            {
+                if (string.IsNullOrEmpty(model.OutlookEmail))
+                {
+                    TempData["NeedsOutlook"] = true;
+                    TempData["EmailOrUsername"] = model.EmailOrUsername;
+                    TempData["Password"] = model.Password;
+                    ModelState.AddModelError("OutlookEmail", "Please enter your Microsoft Outlook email to receive the OTP.");
+                    return View(model);
+                }
+
+                outlookEmail = model.OutlookEmail;
+            }
+
+            // Send OTP to the Outlook email (not saved to DB yet — saved only after successful verification)
+            string otpCode = GenerateOtp();
+            _context.OtpVerifications.Add(new OtpVerification
+            {
+                Email = outlookEmail,
+                Code = otpCode,
+                ExpirationTime = DateTime.Now.AddMinutes(5),
+                IsUsed = false
+            });
+            await _context.SaveChangesAsync();
+
+            try
+            {
+                await _emailService.SendOtpAsync(outlookEmail, otpCode);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[EMAIL ERROR] {ex.Message}");
+                Console.WriteLine($"[DEV OTP] {outlookEmail} → {otpCode}");
+                TempData["OtpFallback"] = $"Email could not be sent. DEV CODE: {otpCode}";
+            }
+
+            TempData["Email"] = outlookEmail;
+            TempData["AccountEmail"] = user.Email;
+            TempData["PendingOutlookEmail"] = string.IsNullOrEmpty(user.OutlookEmail) ? outlookEmail : null;
+            return RedirectToAction("VerifyOtp");
+        }
+
+        // ── MIS Login ────────────────────────────────────────────────────────
+
+        public IActionResult MISLogin()
+        {
+            return View();
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> MISLogin(LoginViewModel model)
+        {
+            if (!ModelState.IsValid)
+                return View(model);
+
+            ApplicationUser? user;
+
+            if (model.EmailOrUsername.Contains("@"))
+                user = await _userManager.FindByEmailAsync(model.EmailOrUsername);
+            else
+                user = await _userManager.FindByNameAsync(model.EmailOrUsername);
+
+            if (user == null)
+            {
+                ModelState.AddModelError("", "User not found.");
+                return View(model);
+            }
+
+            if (user.UserType != "MIS")
+            {
+                ModelState.AddModelError("", "This login is for MIS accounts only.");
+                return View(model);
+            }
+
+            var passwordCheck = await _userManager.CheckPasswordAsync(user, model.Password);
+            if (!passwordCheck)
+            {
+                ModelState.AddModelError("", "Password incorrect.");
+                return View(model);
+            }
+
+            if (string.IsNullOrEmpty(model.OutlookEmail))
+            {
+                ModelState.AddModelError("OutlookEmail", "Please enter your Microsoft Outlook email to receive the OTP.");
+                return View(model);
+            }
+
+            string outlookEmail = model.OutlookEmail;
+
+            string otpCode = GenerateOtp();
+            _context.OtpVerifications.Add(new OtpVerification
+            {
+                Email = outlookEmail,
+                Code = otpCode,
+                ExpirationTime = DateTime.Now.AddMinutes(5),
+                IsUsed = false
+            });
+            await _context.SaveChangesAsync();
+
+            bool emailSent = false;
+            try
+            {
+                await _emailService.SendOtpAsync(outlookEmail, otpCode);
+                emailSent = true;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[EMAIL ERROR] {ex.Message}");
+            }
+
+            TempData["OtpFallback"] = emailSent
+                ? $"OTP sent to {outlookEmail}. Code: {otpCode}"
+                : $"Email could not be sent. Your OTP code is: {otpCode}";
+
+            TempData["Email"] = outlookEmail;
+            TempData["AccountEmail"] = user.Email;
+            TempData["PendingOutlookEmail"] = string.IsNullOrEmpty(user.OutlookEmail) ? outlookEmail : null;
+            return RedirectToAction("VerifyOtp");
+        }
+
+        // ── Verify Email OTP (returning admin users) ─────────────────────────
+
+        [HttpPost]
+        public async Task<IActionResult> VerifyOtp(VerifyOtpViewModel model)
+        {
+            if (!ModelState.IsValid)
+                return View(model);
+
+            var otp = _context.OtpVerifications
+                .Where(x => x.Email == model.Email && x.Code == model.Code && !x.IsUsed)
+                .OrderByDescending(x => x.Id)
+                .FirstOrDefault();
+
+            if (otp == null)
+            {
+                ModelState.AddModelError("", "Invalid OTP.");
+                return View(model);
+            }
+
+            if (otp.ExpirationTime < DateTime.Now)
+            {
+                ModelState.AddModelError("", "OTP has expired.");
+                return View(model);
+            }
+
+            otp.IsUsed = true;
+            await _context.SaveChangesAsync();
+
+            // Find user by the account email stored at login time, then fallback lookups
+            var accountEmail = TempData["AccountEmail"]?.ToString();
+            var user = (!string.IsNullOrEmpty(accountEmail) ? await _userManager.FindByEmailAsync(accountEmail) : null)
+                    ?? _userManager.Users.FirstOrDefault(u => u.OutlookEmail == model.Email)
+                    ?? await _userManager.FindByEmailAsync(model.Email);
+            if (user == null)
+                return RedirectToAction("Login");
+
+            // Save OutlookEmail to DB now that OTP is verified successfully
+            var pendingOutlook = TempData["PendingOutlookEmail"]?.ToString();
+            if (!string.IsNullOrEmpty(pendingOutlook) && string.IsNullOrEmpty(user.OutlookEmail))
+            {
+                user.OutlookEmail = pendingOutlook;
+                await _userManager.UpdateAsync(user);
+            }
+
+            await _signInManager.SignInAsync(user, isPersistent: false);
+
+            // First-time login: collect phone number before going to dashboard
+            if (user.IsFirstLogin)
+            {
+                TempData["Email"] = user.Email;
+                return RedirectToAction("CompleteProfile");
+            }
+
+            return RedirectToDashboard(user.UserType);
+        }
+
+        // ── Complete Profile (first-time login) ──────────────────────────────
+
+        [HttpPost]
+        public async Task<IActionResult> CompleteProfile(string phoneNumber)
+        {
+            var email = TempData["Email"]?.ToString();
+            if (string.IsNullOrEmpty(email))
+                return RedirectToAction("Login");
+
+            var user = await _userManager.FindByEmailAsync(email);
+            if (user == null)
+                return RedirectToAction("Login");
+
+            // Save phone number first
+            user.PhoneNumber = phoneNumber;
+            await _userManager.UpdateAsync(user);
+
+            // Generate OTP and send via SMS to verify ownership before saving for reminders
+            string otpCode = GenerateOtp();
+            user.PhoneOTPCode = otpCode;
+            user.PhoneOTPExpiration = DateTime.Now.AddMinutes(5);
+            await _userManager.UpdateAsync(user);
+
+            try
+            {
+                await _smsService.SendOtpAsync(phoneNumber, otpCode);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("==========================================");
+                Console.WriteLine($"  SMS FAILED: {ex.Message}");
+                Console.WriteLine($"  DEV OTP CODE: {otpCode}");
+                Console.WriteLine("==========================================");
+                TempData["SmsError"] = $"SMS could not be delivered. DEV CODE: {otpCode}";
+            }
+
+            TempData["Email"] = email;
+            return RedirectToAction("VerifyPhoneOtp");
+        }
+
+        // ── Verify Phone OTP (first-time login) ──────────────────────────────
+
+        [HttpPost]
+        public async Task<IActionResult> VerifyPhoneOtp(VerifyPhoneOtpViewModel model)
+        {
+            if (!ModelState.IsValid)
+                return View(model);
+
+            var user = await _userManager.FindByEmailAsync(model.Email);
+            if (user == null)
+            {
+                ModelState.AddModelError("", "User not found.");
+                return View(model);
+            }
+
+            if (user.PhoneOTPCode != model.Code)
+            {
+                ModelState.AddModelError("", "Invalid verification code.");
+                return View(model);
+            }
+
+            if (user.PhoneOTPExpiration < DateTime.Now)
+            {
+                ModelState.AddModelError("", "Verification code has expired. Please go back and re-enter your number.");
+                return View(model);
+            }
+
+            // Phone is confirmed — mark it verified and complete first-login setup
+            user.PhoneVerified = true;
+            user.IsFirstLogin = false;
+            user.PhoneOTPCode = "";
+            await _userManager.UpdateAsync(user);
+
+            await _signInManager.SignInAsync(user, isPersistent: false);
+
+            return RedirectToDashboard(user.UserType);
+        }
+
+        // ── Logout ───────────────────────────────────────────────────────────
+
+        public async Task<IActionResult> Logout()
+        {
+            await _signInManager.SignOutAsync();
+            await HttpContext.SignOutAsync(Microsoft.AspNetCore.Authentication.Cookies.CookieAuthenticationDefaults.AuthenticationScheme);
+            return RedirectToAction("Login");
+        }
+
+        // ── Helpers ──────────────────────────────────────────────────────────
+
+        private static string GenerateOtp()
+        {
+            return RandomNumberGenerator.GetInt32(100000, 999999).ToString();
+        }
+
+        private IActionResult RedirectToDashboard(string userType) => userType switch
+        {
+            "MIS" => RedirectToAction("Dashboard", "MIS"),
+            "Librarian" => RedirectToAction("Dashboard", "Librarian"),
+            "Student" => RedirectToAction("Dashboard", "Student"),
+            "Professor" => RedirectToAction("Dashboard", "Professor"),
+            _ => RedirectToAction("Index", "Home")
+        };
+    }
+}

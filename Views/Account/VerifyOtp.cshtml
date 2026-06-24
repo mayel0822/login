@@ -1,0 +1,51 @@
+﻿@model BookHiveLibrary.ViewModels.VerifyOtpViewModel
+
+@{
+    ViewData["Title"] = "Verify OTP";
+}
+
+<div class="min-h-screen flex items-center justify-center bg-violet-700">
+
+    <div class="bg-white rounded-[40px] w-[700px] p-16 flex flex-col items-center">
+
+        <img src="/images/bookhive_logo_v2.svg" class="w-[150px] mb-3" />
+
+        <h3 class="text-2xl mb-2">
+            Verify OTP
+        </h3>
+
+        <p class="text-gray-500 text-center text-base mb-4">
+            A 6-digit code was sent to <strong>@Model.Email</strong>.<br />
+            Enter it below to continue.
+        </p>
+
+        @if (TempData["OtpFallback"] != null)
+        {
+            <div class="w-[450px] bg-yellow-50 border-2 border-yellow-400 text-yellow-900 text-base font-semibold px-4 py-4 rounded-xl mb-4 text-center">
+                @TempData["OtpFallback"]
+            </div>
+        }
+
+        <form method="post"
+              asp-action="VerifyOtp"
+              class="flex flex-col items-center">
+
+            <input asp-for="Email" type="hidden" />
+            <div asp-validation-summary="All"
+                 class="text-red-500 mb-4">
+            </div>
+
+            <input asp-for="Code"
+                   placeholder="Enter 6-digit code"
+                   class="w-[450px] h-[60px] rounded-2xl bg-gray-100 px-6 text-xl mb-8 outline-none" />
+
+            <button type="submit"
+                    class="w-[450px] h-[65px] bg-violet-700 text-white rounded-2xl text-2xl hover:bg-violet-800 transition">
+                Verify
+            </button>
+
+        </form>
+
+    </div>
+
+</div>

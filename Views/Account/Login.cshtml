@@ -1,0 +1,81 @@
+@{
+    ViewData["Title"] = "Login";
+}
+
+<div class="min-h-screen bg-gradient-to-br from-indigo-700 to-purple-700 flex items-center justify-center relative">
+
+
+    <div class="bg-white
+                rounded-[70px]
+                shadow-2xl
+                w-[1150px]
+                h-[950px]
+                flex flex-col
+                items-center
+                pt-10
+                px-20">
+
+        <!-- Logo -->
+        <img src="/images/bookhive_logo_v2.svg"
+             class="w-[700px] mb-10" />
+
+        @if (TempData["Error"] != null)
+        {
+            <div class="w-[500px] bg-red-50 border border-red-300 text-red-700 text-sm px-4 py-3 rounded-xl mb-4 text-center">
+                @TempData["Error"]
+            </div>
+        }
+
+        <!-- Microsoft 365 — Students & Professors -->
+        <p class="text-gray-400 text-base mb-2 tracking-wide">For Students &amp; Professors</p>
+        <a asp-controller="Account"
+           asp-action="MicrosoftLogin"
+           class="w-[500px] h-[80px]
+                  bg-white border border-gray-300
+                  rounded-3xl shadow-md
+                  flex items-center justify-center gap-4
+                  text-2xl hover:bg-gray-50 transition">
+
+            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 21 21">
+                <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
+                <rect x="11" y="1" width="9" height="9" fill="#00a4ef"/>
+                <rect x="1" y="11" width="9" height="9" fill="#7fba00"/>
+                <rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
+            </svg>
+
+            Log in with Microsoft 365
+
+        </a>
+
+        <!-- Divider -->
+        <div class="flex items-center w-[500px] my-8">
+            <div class="flex-grow h-[1px] bg-gray-300"></div>
+            <span class="mx-5 text-gray-400 text-xl">or</span>
+            <div class="flex-grow h-[1px] bg-gray-300"></div>
+        </div>
+
+        <!-- Admin Login — Librarian -->
+        <p class="text-gray-400 text-base mb-2 tracking-wide">For Librarian</p>
+        <a asp-controller="Account"
+           asp-action="AdminLogin"
+           class="w-[500px] h-[80px]
+                  bg-violet-700 text-white
+                  rounded-3xl shadow-lg
+                  flex items-center justify-center
+                  text-2xl hover:bg-violet-800 transition">
+
+            Librarian Login
+
+        </a>
+
+        <!-- MIS Portal -->
+        <div class="mt-6">
+            <a href="/Account/MISLogin"
+               class="text-gray-400 text-sm hover:text-gray-600 underline">
+                MIS Portal
+            </a>
+        </div>
+
+    </div>
+
+</div>

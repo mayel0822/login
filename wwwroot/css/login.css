@@ -1,0 +1,85 @@
+﻿body {
+    margin: 0;
+    background: linear-gradient(135deg,#4f46e5,#6d28d9);
+    height: 100vh;
+    overflow: hidden;
+}
+
+.login-background {
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.login-card {
+    width: 800px;
+    height: 600px;
+    background: white;
+    border-radius: 80px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    box-shadow: 0 15px 40px rgba(0,0,0,.2);
+}
+
+.logo-section {
+    text-align: center;
+    margin-bottom: 50px;
+}
+
+.book-logo {
+    font-size: 120px;
+    color: #5b21b6;
+}
+
+.bookhive-title {
+    font-size: 70px;
+    font-weight: bold;
+    margin-top: -10px;
+}
+
+    .bookhive-title span {
+        color: #6d28d9;
+    }
+
+.login-buttons {
+    width: 450px;
+}
+
+.ms-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 15px;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 20px;
+    padding: 20px;
+    text-decoration: none;
+    color: black;
+    font-size: 24px;
+    margin-bottom: 25px;
+    box-shadow: 0 5px 15px rgba(0,0,0,.15);
+}
+
+.admin-btn {
+    display: block;
+    text-align: center;
+    background: #5b21b6;
+    color: white;
+    padding: 20px;
+    border-radius: 20px;
+    text-decoration: none;
+    font-size: 24px;
+    box-shadow: 0 5px 15px rgba(0,0,0,.2);
+}
+
+.ms-btn:hover {
+    transform: translateY(-2px);
+}
+
+.admin-btn:hover {
+    background: #4c1d95;
+}

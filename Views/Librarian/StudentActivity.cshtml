@@ -1,0 +1,72 @@
+@using BookHiveLibrary.Models
+@model IEnumerable<RFIDLog>
+@{
+    Layout = "~/Views/Shared/_LibrarianLayout.cshtml";
+    ViewData["Title"] = "Student Activity";
+}
+
+<div class="bg-white rounded-xl shadow-sm border border-gray-100">
+    <div class="px-5 py-4 border-b border-gray-100 flex flex-wrap gap-3 items-center justify-between">
+        <h2 class="font-semibold text-gray-700">Student Activity Log</h2>
+        <form method="get" class="flex gap-2 flex-wrap">
+            <input type="date" name="date" value="@ViewBag.Date"
+                   class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" />
+            <select name="activity" class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
+                <option value="">All Activity</option>
+                <option value="Inside" selected="@(ViewBag.Activity == "Inside" ? "selected" : null)">Inside</option>
+                <option value="Left" selected="@(ViewBag.Activity == "Left" ? "selected" : null)">Left</option>
+            </select>
+            <button type="submit" class="px-4 py-2 text-sm text-white rounded-lg" style="background-color:#1e3a6e;">Filter</button>
+        </form>
+    </div>
+
+    <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+            <thead class="bg-gray-50 text-gray-500 text-xs uppercase">
+                <tr>
+                    <th class="px-4 py-3 text-left">Stud ID</th>
+                    <th class="px-4 py-3 text-left">Name</th>
+                    <th class="px-4 py-3 text-left">Level</th>
+                    <th class="px-4 py-3 text-left">Course</th>
+                    <th class="px-4 py-3 text-left">Yr</th>
+                    <th class="px-4 py-3 text-left">Section</th>
+                    <th class="px-4 py-3 text-left">Tap In</th>
+                    <th class="px-4 py-3 text-left">Tap Out</th>
+                    <th class="px-4 py-3 text-left">Status</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                @foreach (var log in Model)
+                {
+                    var duration = log.TapOutTime.HasValue
+                        ? (log.TapOutTime.Value - log.TapInTime).ToString(@"hh\:mm")
+                        : "—";
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-4 py-3 text-gray-600">@log.User?.StudentNumber</td>
+                        <td class="px-4 py-3 font-medium text-gray-800">@log.User?.FirstName @log.User?.LastName</td>
+                        <td class="px-4 py-3 text-gray-600">@log.User?.Level</td>
+                        <td class="px-4 py-3 text-gray-600">@log.User?.Course</td>
+                        <td class="px-4 py-3 text-gray-600">—</td>
+                        <td class="px-4 py-3 text-gray-600">@log.User?.Section</td>
+                        <td class="px-4 py-3 text-gray-600">@log.TapInTime.ToString("MM/dd hh:mm tt")</td>
+                        <td class="px-4 py-3 text-gray-600">@(log.TapOutTime?.ToString("MM/dd hh:mm tt") ?? "—")</td>
+                        <td class="px-4 py-3">
+                            @if (log.IsInside)
+                            {
+                                <span class="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">Inside</span>
+                            }
+                            else
+                            {
+                                <span class="px-2 py-1 bg-gray-100 text-gray-500 rounded-full text-xs font-medium">Left</span>
+                            }
+                        </td>
+                    </tr>
+                }
+                @if (!Model.Any())
+                {
+                    <tr><td colspan="9" class="px-4 py-8 text-center text-gray-400">No activity records found</td></tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
