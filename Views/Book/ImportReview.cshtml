@@ -1,0 +1,175 @@
+@using BookHiveLibrary.Models
+@model IEnumerable<Book>
+@{
+    Layout = "~/Views/Shared/_LibrarianLayout.cshtml";
+    ViewData["Title"] = "Import Review";
+}
+
+<div class="bg-white rounded-xl shadow-sm border border-gray-100">
+    <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+        <div>
+            <h2 class="font-semibold text-gray-700">Imported Books — Review</h2>
+            <p class="text-xs text-gray-400 mt-0.5">Add cover image and synopsis for each book, then save to the catalog.</p>
+        </div>
+        <a href="@Url.Action("Index","Book")"
+           class="px-4 py-2 text-sm text-white rounded-lg font-medium" style="background:#1e3a6e;">
+            Done — Go to Book List
+        </a>
+    </div>
+
+    <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+            <thead style="background:#1e3a6e;">
+                <tr>
+                    <th class="px-4 py-3 text-left text-white font-medium text-xs">Title</th>
+                    <th class="px-4 py-3 text-left text-white font-medium text-xs">Author</th>
+                    <th class="px-4 py-3 text-left text-white font-medium text-xs">Category</th>
+                    <th class="px-4 py-3 text-left text-white font-medium text-xs">Call No.</th>
+                    <th class="px-4 py-3 text-left text-white font-medium text-xs">Copies</th>
+                    <th class="px-4 py-3 text-left text-white font-medium text-xs">Cover</th>
+                    <th class="px-4 py-3 text-left text-white font-medium text-xs">Synopsis</th>
+                    <th class="px-4 py-3 text-white font-medium text-xs"></th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                @foreach (var book in Model)
+                {
+                    <tr id="row-@book.Id" class="hover:bg-gray-50">
+                        <td class="px-4 py-3 font-medium text-gray-800">@book.Title</td>
+                        <td class="px-4 py-3 text-gray-600">@book.Author</td>
+                        <td class="px-4 py-3 text-gray-600">@book.Category</td>
+                        <td class="px-4 py-3 text-gray-600">@book.CallNumber</td>
+                        <td class="px-4 py-3 text-gray-600 text-center">@book.TotalQuantity</td>
+                        <td class="px-4 py-3">
+                            @if (!string.IsNullOrEmpty(book.CoverImageUrl))
+                            {
+                                <img src="@book.CoverImageUrl" class="w-8 h-10 object-cover rounded" />
+                            }
+                            else
+                            {
+                                <span class="text-xs text-gray-400">—</span>
+                            }
+                        </td>
+                        <td class="px-4 py-3 text-gray-400 text-xs max-w-[160px] truncate">
+                            @(string.IsNullOrEmpty(book.Description) ? "—" : book.Description)
+                        </td>
+                        <td class="px-4 py-3 text-right">
+                            <button onclick="openEditModal(@book.Id, '@Html.Raw(book.Title.Replace("'", "\\'"))', '@Html.Raw(book.CoverImageUrl)', '@Html.Raw(book.Description.Replace("'", "\\'"))')"
+                                    class="px-3 py-1.5 text-xs font-medium text-white rounded-lg" style="background:#1e3a6e;">
+                                Edit
+                            </button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Edit Modal -->
+<div id="editModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden">
+    <div class="bg-white rounded-xl shadow-xl w-[520px] overflow-hidden">
+        <div class="px-6 py-4 flex items-center justify-between" style="background:#1e3a6e;">
+            <div>
+                <h3 class="text-sm font-semibold text-white">Edit Book Details</h3>
+                <p class="text-xs text-white/60 mt-0.5" id="editBookTitle">—</p>
+            </div>
+            <button onclick="closeEditModal()" class="text-white/60 hover:text-white">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </button>
+        </div>
+        <div class="px-6 py-5 space-y-4">
+            <input type="hidden" id="editBookId" />
+            <div>
+                <label class="block text-xs text-gray-500 mb-1">Cover Image URL</label>
+                <input type="text" id="editCoverUrl" placeholder="https://..."
+                       class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" />
+                <div id="coverPreviewWrap" class="mt-2 hidden">
+                    <img id="coverPreview" src="" class="h-28 rounded-lg object-cover border border-gray-200" />
+                </div>
+            </div>
+            <div>
+                <label class="block text-xs text-gray-500 mb-1">Synopsis</label>
+                <textarea id="editSynopsis" rows="5" placeholder="Write a short description of the book..."
+                          class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 resize-none"></textarea>
+            </div>
+        </div>
+        <div class="px-6 py-4 border-t border-gray-100 flex gap-3">
+            <button onclick="closeEditModal()" class="flex-1 py-2.5 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200">Cancel</button>
+            <button onclick="saveBookDetails()" id="saveBtn"
+                    class="flex-1 py-2.5 text-white rounded-lg text-sm font-medium" style="background:#1e3a6e;">
+                Save
+            </button>
+        </div>
+    </div>
+</div>
+
+@Html.AntiForgeryToken()
+
+@section Scripts {
+<script>
+function openEditModal(id, title, coverUrl, synopsis) {
+    document.getElementById('editBookId').value    = id;
+    document.getElementById('editBookTitle').textContent = title;
+    document.getElementById('editCoverUrl').value  = coverUrl || '';
+    document.getElementById('editSynopsis').value  = synopsis || '';
+    updateCoverPreview(coverUrl);
+    document.getElementById('editModal').classList.remove('hidden');
+}
+
+function closeEditModal() {
+    document.getElementById('editModal').classList.add('hidden');
+}
+
+document.getElementById('editCoverUrl').addEventListener('input', function() {
+    updateCoverPreview(this.value);
+});
+
+function updateCoverPreview(url) {
+    const wrap = document.getElementById('coverPreviewWrap');
+    const img  = document.getElementById('coverPreview');
+    if (url && url.startsWith('http')) {
+        img.src = url;
+        wrap.classList.remove('hidden');
+    } else {
+        wrap.classList.add('hidden');
+    }
+}
+
+async function saveBookDetails() {
+    const id       = document.getElementById('editBookId').value;
+    const cover    = document.getElementById('editCoverUrl').value.trim();
+    const synopsis = document.getElementById('editSynopsis').value.trim();
+    const btn      = document.getElementById('saveBtn');
+
+    btn.textContent = 'Saving...';
+    btn.disabled    = true;
+
+    const fd = new FormData();
+    fd.append('id',             id);
+    fd.append('coverImageUrl',  cover);
+    fd.append('description',    synopsis);
+    fd.append('__RequestVerificationToken', document.querySelector('input[name="__RequestVerificationToken"]').value);
+
+    const res  = await fetch('@Url.Action("UpdateBookDetails","Book")', { method: 'POST', body: fd });
+    const data = await res.json();
+
+    if (data.success) {
+        // Update the row inline
+        const row = document.getElementById('row-' + id);
+        if (row) {
+            const coverCell   = row.cells[5];
+            const synopsisCell = row.cells[6];
+            coverCell.innerHTML   = cover   ? `<img src="${cover}" class="w-8 h-10 object-cover rounded" />` : '<span class="text-xs text-gray-400">—</span>';
+            synopsisCell.textContent = synopsis ? synopsis.substring(0, 60) + (synopsis.length > 60 ? '…' : '') : '—';
+        }
+        closeEditModal();
+    }
+
+    btn.textContent = 'Save';
+    btn.disabled    = false;
+}
+</script>
+}

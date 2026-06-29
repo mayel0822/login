@@ -37,7 +37,57 @@ namespace BookHiveLibrary.Controllers
                 .OrderBy(c => c.ComputerNumber)
                 .ToListAsync();
 
+            ViewBag.SectionAdvisers = await _context.Sections
+                .ToDictionaryAsync(s => s.SectionName, s => s.AdviserName);
+
+            ViewBag.AllUsers = await _userManager.Users
+                .Where(u => (u.UserType == "Student" || u.UserType == "Professor") && u.IsActive)
+                .OrderBy(u => u.LastName)
+                .ToListAsync();
+
             return View(computers);
+        }
+
+        // Transaction Management - Computer
+        public async Task<IActionResult> Transaction()
+        {
+            var computers = await _context.ComputerUnits
+                .Where(c => !c.IsArchived)
+                .Include(c => c.Sessions.Where(s => s.IsActive))
+                    .ThenInclude(s => s.User)
+                .OrderBy(c => c.ComputerNumber)
+                .ToListAsync();
+
+            ViewBag.SectionAdvisers = await _context.Sections
+                .ToDictionaryAsync(s => s.SectionName, s => s.AdviserName);
+
+            return View(computers);
+        }
+
+        // RFID lookup for computer assignment
+        [HttpGet]
+        public async Task<IActionResult> FindUserByRfid(string rfid)
+        {
+            var user = await _userManager.Users.FirstOrDefaultAsync(u => u.RFIDNumber == rfid);
+            if (user == null)
+                return Json(new { found = false, message = "RFID card not registered." });
+            if (!user.IsActive)
+                return Json(new { found = false, message = "This account is deactivated." });
+
+            var sectionRecord = await _context.Sections
+                .FirstOrDefaultAsync(s => s.SectionName == user.Section);
+
+            return Json(new
+            {
+                found = true,
+                userId = user.Id,
+                firstName = user.FirstName,
+                lastName = user.LastName,
+                middleName = user.MiddleName ?? "",
+                section = user.Section ?? "",
+                adviserName = sectionRecord?.AdviserName ?? "",
+                userType = user.UserType
+            });
         }
 
         // Register / Add Computer
@@ -92,7 +142,75 @@ namespace BookHiveLibrary.Controllers
             computer.IsAvailable = false;
             await _context.SaveChangesAsync();
             TempData["Success"] = "Session started.";
-            return RedirectToAction("Index");
+            return RedirectToAction("Transaction");
+        }
+
+        // Auto-end session via AJAX (called by librarian UI when timer expires)
+        [HttpPost]
+        public async Task<IActionResult> EndSessionAjax(int sessionId)
+        {
+            var session = await _context.ComputerSessions
+                .Include(s => s.ComputerUnit)
+                .FirstOrDefaultAsync(s => s.Id == sessionId);
+            if (session == null) return Json(new { success = false });
+
+            session.EndTime = DateTime.Now;
+            session.IsActive = false;
+            if (session.ComputerUnit != null)
+                session.ComputerUnit.IsAvailable = true;
+
+            await _context.SaveChangesAsync();
+            return Json(new { success = true, computerId = session.ComputerUnitId });
+        }
+
+        // Kiosk page — fullscreen LAN page on student computer
+        [HttpGet]
+        public IActionResult Kiosk(string pc)
+        {
+            ViewBag.PcNumber = pc;
+            return View();
+        }
+
+        // Kiosk status poll endpoint
+        [HttpGet]
+        public async Task<IActionResult> KioskStatus(string pc)
+        {
+            var computer = await _context.ComputerUnits
+                .Include(c => c.Sessions.Where(s => s.IsActive))
+                    .ThenInclude(s => s.User)
+                .FirstOrDefaultAsync(c => c.ComputerNumber == pc);
+
+            if (computer == null) return Json(new { found = false });
+
+            var sess = computer.Sessions.FirstOrDefault(s => s.IsActive);
+            if (sess == null) return Json(new { isActive = false });
+
+            var totalSecs = (sess.AllowedMinutes + sess.ExtendedMinutes) * 60;
+            var elapsed   = (int)(DateTime.Now - sess.StartTime).TotalSeconds;
+            var remaining = totalSecs - elapsed;
+
+            return Json(new
+            {
+                isActive  = true,
+                remaining,
+                totalSecs,
+                name      = sess.User != null ? sess.User.LastName + ", " + sess.User.FirstName : "",
+                section   = sess.User?.Section ?? ""
+            });
+        }
+
+        // Extend session time
+        [HttpPost]
+        public async Task<IActionResult> ExtendTime(int sessionId, int minutes)
+        {
+            var session = await _context.ComputerSessions.FindAsync(sessionId);
+            if (session == null) return NotFound();
+            session.ExtendedMinutes += minutes;
+            await _context.SaveChangesAsync();
+            return Json(new {
+                success = true,
+                totalMinutes = session.AllowedMinutes + session.ExtendedMinutes
+            });
         }
 
         // End session
@@ -113,7 +231,7 @@ namespace BookHiveLibrary.Controllers
 
             await _context.SaveChangesAsync();
             TempData["Success"] = "Session ended.";
-            return RedirectToAction("Index");
+            return RedirectToAction("Transaction");
         }
 
         // Archive Computer

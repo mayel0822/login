@@ -3,6 +3,7 @@ using BookHiveLibrary.Models;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using OfficeOpenXml;
 
 namespace BookHiveLibrary.Controllers
 {
@@ -80,17 +81,28 @@ namespace BookHiveLibrary.Controllers
 
         // ── Registration ─────────────────────────────────────────────────────
 
-        public IActionResult Registration() => View();
+        public async Task<IActionResult> Registration()
+        {
+            ViewBag.Students = await _userManager.Users
+                .Where(u => u.UserType == "Student" && u.IsActive)
+                .OrderBy(u => u.LastName)
+                .ToListAsync();
+            ViewBag.Professors = await _userManager.Users
+                .Where(u => u.UserType == "Professor" && u.IsActive)
+                .OrderBy(u => u.LastName)
+                .ToListAsync();
+            return View();
+        }
 
         [HttpPost]
         public async Task<IActionResult> Registration(string firstName, string lastName, string middleName,
             string email, string userType, string studentNumber, string employeeNumber,
-            string section, string rfidNumber, string phoneNumber, string password)
+            string section, string rfidNumber, string phoneNumber)
         {
-            if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
+            if (string.IsNullOrWhiteSpace(email))
             {
-                TempData["Error"] = "Email and password are required.";
-                return View();
+                TempData["Error"] = "Email is required.";
+                return await Registration();
             }
 
             var user = new ApplicationUser
@@ -107,10 +119,13 @@ namespace BookHiveLibrary.Controllers
                 RFIDNumber = rfidNumber,
                 PhoneNumber = phoneNumber,
                 IsFirstLogin = false,
-                IsActive = true
+                IsActive = true,
+                EmailConfirmed = true
             };
 
-            var result = await _userManager.CreateAsync(user, password);
+            // Password not set by librarian — student authenticates via Microsoft OAuth
+            string autoPassword = $"BookHive@{Guid.NewGuid().ToString("N")[..8]}!";
+            var result = await _userManager.CreateAsync(user, autoPassword);
             if (!result.Succeeded)
             {
                 TempData["Error"] = string.Join("; ", result.Errors.Select(e => e.Description));
@@ -118,8 +133,93 @@ namespace BookHiveLibrary.Controllers
             }
 
             await _userManager.AddToRoleAsync(user, userType);
-            TempData["Success"] = $"{userType} registered successfully.";
+            TempData["Success"] = $"{userType} \"{firstName} {lastName}\" registered successfully.";
             return RedirectToAction("UserManagement");
+        }
+
+        // ── Excel Import ─────────────────────────────────────────────────────
+
+        [HttpPost]
+        public async Task<IActionResult> ImportExcel(IFormFile file)
+        {
+            if (file == null || file.Length == 0)
+            {
+                TempData["Error"] = "Please select an Excel file.";
+                return View("Registration");
+            }
+
+            ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
+            var results = new List<string[]>();
+
+            using var stream = new MemoryStream();
+            await file.CopyToAsync(stream);
+            using var package = new ExcelPackage(stream);
+            var sheet = package.Workbook.Worksheets[0];
+            int rowCount = sheet.Dimension?.Rows ?? 0;
+
+            for (int row = 2; row <= rowCount; row++)
+            {
+                string userType     = sheet.Cells[row, 1].Text.Trim();
+                string firstName    = sheet.Cells[row, 2].Text.Trim();
+                string middleName   = sheet.Cells[row, 3].Text.Trim();
+                string lastName     = sheet.Cells[row, 4].Text.Trim();
+                string email        = sheet.Cells[row, 5].Text.Trim();
+                string phone        = sheet.Cells[row, 6].Text.Trim();
+                string studentNum   = sheet.Cells[row, 7].Text.Trim();
+                string employeeNum  = sheet.Cells[row, 8].Text.Trim();
+                string section      = sheet.Cells[row, 9].Text.Trim();
+
+                string fullName = $"{firstName} {lastName}";
+                string idNum = !string.IsNullOrEmpty(studentNum) ? studentNum : employeeNum;
+
+                if (string.IsNullOrEmpty(email))
+                {
+                    results.Add(new[] { userType, fullName, email, idNum, section, "Skipped (no email)" });
+                    continue;
+                }
+
+                var existing = await _userManager.FindByEmailAsync(email);
+                if (existing != null)
+                {
+                    results.Add(new[] { userType, fullName, email, idNum, section, "Already exists" });
+                    continue;
+                }
+
+                var user = new ApplicationUser
+                {
+                    UserName = email,
+                    Email = email,
+                    FirstName = firstName,
+                    LastName = lastName,
+                    MiddleName = middleName,
+                    UserType = userType,
+                    StudentNumber = studentNum,
+                    EmployeeNumber = employeeNum,
+                    Section = section,
+                    PhoneNumber = phone,
+                    IsFirstLogin = false,
+                    IsActive = true,
+                    EmailConfirmed = true
+                };
+
+                string autoPassword = $"BookHive@{Guid.NewGuid().ToString("N")[..8]}!";
+                var result = await _userManager.CreateAsync(user, autoPassword);
+
+                if (result.Succeeded)
+                {
+                    await _userManager.AddToRoleAsync(user, userType);
+                    results.Add(new[] { userType, fullName, email, idNum, section, "Registered" });
+                }
+                else
+                {
+                    string error = result.Errors.FirstOrDefault()?.Description ?? "Failed";
+                    results.Add(new[] { userType, fullName, email, idNum, section, $"Failed: {error}" });
+                }
+            }
+
+            ViewBag.ImportedUsers = results;
+            TempData["Success"] = $"Import complete: {results.Count(r => r[5] == "Registered")} registered, {results.Count(r => r[5] != "Registered")} skipped/failed.";
+            return View("Registration");
         }
 
         // ── Sectioning ───────────────────────────────────────────────────────
@@ -131,17 +231,36 @@ namespace BookHiveLibrary.Controllers
         }
 
         [HttpPost]
-        public async Task<IActionResult> CreateSection(string level, string course, string year, string sectionName)
+        public async Task<IActionResult> CreateSection(string level, string course, string year, string sectionName, string adviserName)
         {
             _context.Sections.Add(new Section
             {
                 Level = level,
                 Course = course,
                 Year = year,
-                SectionName = sectionName
+                SectionName = sectionName,
+                AdviserName = adviserName ?? ""
             });
             await _context.SaveChangesAsync();
             TempData["Success"] = "Section created.";
+            return RedirectToAction("Sectioning");
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> DeleteAllSections(string levelGroup)
+        {
+            IQueryable<Section> query = _context.Sections;
+
+            if (levelGroup == "JHS")
+                query = query.Where(s => s.Level == "Grade 7" || s.Level == "Grade 8" || s.Level == "Grade 9" || s.Level == "Grade 10");
+            else if (levelGroup == "SHS")
+                query = query.Where(s => s.Level == "SHS");
+            else if (levelGroup == "College")
+                query = query.Where(s => s.Level == "College");
+
+            _context.Sections.RemoveRange(query);
+            await _context.SaveChangesAsync();
+            TempData["Success"] = $"{levelGroup} sections have been reset.";
             return RedirectToAction("Sectioning");
         }
 
@@ -210,26 +329,81 @@ namespace BookHiveLibrary.Controllers
 
         // ── Student Activity (RFID live tracker) ─────────────────────────────
 
-        public async Task<IActionResult> StudentActivity(string? date, string? activity)
+        public async Task<IActionResult> StudentActivity(string? date, string? logType)
         {
-            var query = _context.RFIDLogs
+            logType ??= "Library";
+
+            DateTime? parsedDate = null;
+            if (!string.IsNullOrWhiteSpace(date) && DateTime.TryParse(date, out var d))
+                parsedDate = d;
+
+            if (logType == "Computer")
+            {
+                var csQuery = _context.ComputerSessions
+                    .Include(s => s.User)
+                    .Include(s => s.ComputerUnit)
+                    .AsQueryable();
+
+                if (parsedDate.HasValue)
+                    csQuery = csQuery.Where(s => s.StartTime.Date == parsedDate.Value.Date);
+
+                ViewBag.ComputerSessions = await csQuery.OrderByDescending(s => s.StartTime).Take(100).ToListAsync();
+                ViewBag.Date = date;
+                ViewBag.LogType = logType;
+                return View(new List<RFIDLog>());
+            }
+
+            if (logType == "Book")
+            {
+                var bQuery = _context.BookReservations
+                    .Include(r => r.User)
+                    .Include(r => r.Book)
+                    .AsQueryable();
+
+                if (parsedDate.HasValue)
+                    bQuery = bQuery.Where(r => r.CreatedAt.Date == parsedDate.Value.Date);
+
+                ViewBag.BookLogs = await bQuery.OrderByDescending(r => r.CreatedAt).Take(100).ToListAsync();
+                ViewBag.Date = date;
+                ViewBag.LogType = logType;
+                return View(new List<RFIDLog>());
+            }
+
+            var rfidQuery = _context.RFIDLogs
                 .Include(l => l.User)
                 .AsQueryable();
 
-            if (!string.IsNullOrWhiteSpace(date) && DateTime.TryParse(date, out var parsedDate))
-                query = query.Where(l => l.TapInTime.Date == parsedDate.Date);
+            if (parsedDate.HasValue)
+                rfidQuery = rfidQuery.Where(l => l.TapInTime.Date == parsedDate.Value.Date);
 
-            if (activity == "Inside")
-                query = query.Where(l => l.IsInside);
-            else if (activity == "Left")
-                query = query.Where(l => !l.IsInside);
-
-            var logs = await query.OrderByDescending(l => l.TapInTime).Take(100).ToListAsync();
+            var logs = await rfidQuery.OrderByDescending(l => l.TapInTime).Take(100).ToListAsync();
 
             ViewBag.Date = date;
-            ViewBag.Activity = activity;
+            ViewBag.LogType = logType;
 
             return View(logs);
+        }
+
+        // ── Notifications ─────────────────────────────────────────────────────
+
+        public async Task<IActionResult> GetNotifications()
+        {
+            var pending = await _context.BookReservations
+                .Include(r => r.User)
+                .Include(r => r.Book)
+                .Where(r => r.Status == "Pending")
+                .OrderByDescending(r => r.CreatedAt)
+                .Take(20)
+                .Select(r => new {
+                    r.Id,
+                    user = r.User != null ? r.User.FirstName + " " + r.User.LastName : "Unknown",
+                    userType = r.User != null ? r.User.UserType : "",
+                    book = r.Book != null ? r.Book.Title : "Unknown",
+                    createdAt = r.CreatedAt.ToString("MMM d, h:mm tt")
+                })
+                .ToListAsync();
+
+            return Json(new { count = pending.Count, items = pending });
         }
 
         // RFID tap-in (called by IoT device via HTTP)

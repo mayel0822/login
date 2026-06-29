@@ -1,3 +1,5 @@
+@model BookHiveLibrary.ViewModels.LoginViewModel
+
 @{
     ViewData["Title"] = "Librarian Login";
 }
@@ -6,7 +8,7 @@
      style="background: linear-gradient(135deg, #4f46e5, #6d28d9);">
 
     <div class="bg-white rounded-[70px] shadow-2xl text-center"
-         style="width:800px; min-height:600px; padding:80px 80px 80px 80px;">
+         style="width:800px; min-height:600px; padding:80px 80px 60px 80px;">
 
         <!-- Logo -->
         <div class="flex flex-col items-center">
@@ -21,23 +23,48 @@
             </div>
         }
 
-        <!-- Sign in Button -->
-        <div class="flex justify-center mt-10">
+        <!-- Microsoft Sign In -->
+        <div class="flex justify-center">
             <a asp-controller="Account"
                asp-action="MicrosoftLogin"
                class="w-[470px] h-[70px] bg-white border-2 border-gray-200 rounded-3xl shadow-md flex items-center justify-center gap-4 text-xl hover:bg-gray-50 transition">
-
                 <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 21 21">
                     <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
                     <rect x="11" y="1" width="9" height="9" fill="#00a4ef"/>
                     <rect x="1" y="11" width="9" height="9" fill="#7fba00"/>
                     <rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
                 </svg>
-
                 Sign in with Microsoft
-
             </a>
         </div>
+
+        <!-- Divider -->
+        <div class="flex items-center w-[470px] mx-auto my-6">
+            <div class="flex-grow h-[1px] bg-gray-200"></div>
+            <span class="mx-4 text-gray-400 text-sm">or</span>
+            <div class="flex-grow h-[1px] bg-gray-200"></div>
+        </div>
+
+        <!-- Username/Password Form (Testing) -->
+        <form asp-action="AdminLogin" asp-controller="Account" method="post"
+              class="flex flex-col items-center">
+            <div asp-validation-summary="ModelOnly" class="text-red-500 mb-4 text-center text-sm"></div>
+
+            <input asp-for="EmailOrUsername"
+                   type="text"
+                   placeholder="Email or Username"
+                   class="w-[470px] h-[58px] px-6 bg-gray-100 rounded-2xl text-lg outline-none shadow-sm mb-4" />
+
+            <input asp-for="Password"
+                   type="password"
+                   placeholder="Password"
+                   class="w-[470px] h-[58px] px-6 bg-gray-100 rounded-2xl text-lg outline-none shadow-sm mb-6" />
+
+            <button type="submit"
+                    class="w-[470px] h-[60px] rounded-3xl bg-violet-700 text-white text-xl font-medium shadow-lg hover:bg-violet-800 transition">
+                Sign In
+            </button>
+        </form>
 
         <!-- Back -->
         <div class="flex justify-end mt-10">

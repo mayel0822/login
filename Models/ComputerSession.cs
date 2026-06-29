@@ -10,6 +10,8 @@ namespace BookHiveLibrary.Models
         public DateTime StartTime { get; set; } = DateTime.Now;
         public DateTime? EndTime { get; set; }
         public bool IsActive { get; set; } = true;
+        public int AllowedMinutes { get; set; } = 60;
+        public int ExtendedMinutes { get; set; } = 0;
         public DateTime CreatedAt { get; set; } = DateTime.Now;
     }
 }

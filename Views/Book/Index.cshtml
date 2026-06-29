@@ -27,29 +27,32 @@
 
 <div class="bg-white rounded-xl shadow-sm border border-gray-100">
     <!-- Search & Filters -->
-    <div class="px-5 py-4 border-b border-gray-100 flex flex-wrap gap-3 items-center justify-between">
-        <form method="get" class="flex gap-2 flex-wrap flex-1">
-            <input type="text" name="search" value="@ViewBag.Search"
-                   placeholder="Search by title, author, call number..."
-                   class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 w-64" />
-            <select name="category" class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
-                <option value="">All Categories</option>
-                @if (ViewBag.Categories != null)
-                {
-                    foreach (var cat in (List<string>)ViewBag.Categories)
+    <div class="px-5 py-4 border-b border-gray-100 flex items-center gap-3">
+        <form method="get" class="flex flex-1">
+            <div class="flex flex-1 border border-gray-300 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-blue-300">
+                <input type="text" name="search" value="@ViewBag.Search"
+                       placeholder="Search by title, author, call number..."
+                       class="flex-1 px-3 py-2 text-sm outline-none bg-white" />
+                <div class="w-px bg-gray-200 self-stretch"></div>
+                <select name="category" class="px-3 py-2 text-sm outline-none bg-white text-gray-600 cursor-pointer">
+                    <option value="">All Categories</option>
+                    @if (ViewBag.Categories != null)
                     {
-                        <option value="@cat" selected="@(ViewBag.Category == cat ? "selected" : null)">@cat</option>
+                        foreach (var cat in (List<string>)ViewBag.Categories)
+                        {
+                            <option value="@cat" selected="@(ViewBag.Category == cat ? "selected" : null)">@cat</option>
+                        }
                     }
-                }
-            </select>
-            <button type="submit" class="px-4 py-2 text-sm text-white rounded-lg" style="background-color:#1e3a6e;">Search</button>
+                </select>
+                <button type="submit" class="px-4 py-2 text-sm text-white font-medium" style="background-color:#1e3a6e;">Search</button>
+            </div>
             @if (!string.IsNullOrEmpty(ViewBag.Search as string) || !string.IsNullOrEmpty(ViewBag.Category as string))
             {
-                <a href="@Url.Action("Index","Book")" class="px-4 py-2 text-sm bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200">Clear</a>
+                <a href="@Url.Action("Index","Book")" class="ml-2 px-4 py-2 text-sm bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 self-center">Clear</a>
             }
         </form>
         <a href="@Url.Action("Register","Book")"
-           class="px-4 py-2 text-sm text-white rounded-lg flex-shrink-0" style="background-color:#1e3a6e;">+ Add Book</a>
+           class="px-4 py-2 text-sm text-white rounded-lg flex-shrink-0 font-medium" style="background-color:#1e3a6e;">+ Add Book</a>
     </div>
 
     <!-- Table -->

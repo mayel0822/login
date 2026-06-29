@@ -10,15 +10,25 @@ namespace BookHiveLibrary.Controllers
     {
         private const int MaxBooksPerUser = 3;
         private const int BorrowDays = 2;
-        private const int PickupHours = 24;
+        private const int ReservationWindowHours = 3;
+        private static readonly TimeSpan LibraryCloseTime = new TimeSpan(16, 30, 0);
+
+        private static DateTime CalculateDueDate() =>
+            DateTime.Today.AddDays(BorrowDays).Date + LibraryCloseTime;
 
         private readonly ApplicationDbContext _context;
         private readonly UserManager<ApplicationUser> _userManager;
+        private readonly BookHiveLibrary.Services.EmailService _emailService;
+        private readonly BookHiveLibrary.Services.SmsService _smsService;
 
-        public BorrowController(ApplicationDbContext context, UserManager<ApplicationUser> userManager)
+        public BorrowController(ApplicationDbContext context, UserManager<ApplicationUser> userManager,
+            BookHiveLibrary.Services.EmailService emailService,
+            BookHiveLibrary.Services.SmsService smsService)
         {
             _context = context;
             _userManager = userManager;
+            _emailService = emailService;
+            _smsService = smsService;
         }
 
         private async Task LoadBorrowFormData()
@@ -36,6 +46,18 @@ namespace BookHiveLibrary.Controllers
         // Transaction Management - Book
         public async Task<IActionResult> Index()
         {
+            // Auto-void reservations past the 3-hour pickup window
+            var expiredReservations = await _context.BookReservations
+                .Where(r => r.Status == "Pending" && r.PickupDeadline < DateTime.Now)
+                .ToListAsync();
+            foreach (var exp in expiredReservations)
+            {
+                exp.Status = "Void";
+                exp.LibrarianRemarks = "Auto-voided: not picked up within 3 hours.";
+            }
+            if (expiredReservations.Any())
+                await _context.SaveChangesAsync();
+
             // Pending reservations panel
             ViewBag.PendingReservations = await _context.BookReservations
                 .Include(r => r.User)
@@ -44,16 +66,27 @@ namespace BookHiveLibrary.Controllers
                 .OrderBy(r => r.CreatedAt)
                 .ToListAsync();
 
-            // Books due soon panel (due within 2 days or overdue)
-            var dueCutoff = DateTime.Now.AddDays(2);
+            ViewBag.SectionAdvisers = await _context.Sections
+                .ToDictionaryAsync(s => s.SectionName, s => s.AdviserName);
+
+            // Send Reminder panel — due within 12 hours AND reminder NOT yet sent
+            var dueCutoff = DateTime.Now.AddHours(12);
             ViewBag.BooksDue = await _context.BookReservations
                 .Include(r => r.User)
                 .Include(r => r.Book)
-                .Where(r => r.Status == "PickedUp" && r.DueDate <= dueCutoff)
+                .Where(r => r.Status == "PickedUp" && r.DueDate <= dueCutoff && !r.ReminderSent)
                 .OrderBy(r => r.DueDate)
                 .ToListAsync();
 
             ViewBag.BooksDueCount = ((List<BookReservation>)ViewBag.BooksDue).Count;
+
+            // All Books Due panel — all active borrowed books with due dates
+            ViewBag.AllBooksDue = await _context.BookReservations
+                .Include(r => r.User)
+                .Include(r => r.Book)
+                .Where(r => r.Status == "PickedUp" || r.Status == "Overdue")
+                .OrderBy(r => r.DueDate)
+                .ToListAsync();
 
             // Borrowed books table
             var borrowedBooks = await _context.BookReservations
@@ -106,13 +139,178 @@ namespace BookHiveLibrary.Controllers
                 BookId = bookId,
                 Status = "PickedUp",
                 ActualPickupTime = DateTime.Now,
-                DueDate = DateTime.Now.AddDays(BorrowDays),
-                PickupDeadline = DateTime.Now.AddHours(PickupHours)
+                DueDate = CalculateDueDate(),
+                PickupDeadline = DateTime.Now
             });
 
             await _context.SaveChangesAsync();
             TempData["Success"] = $"Book \"{book.Title}\" borrowed by {user.FirstName} {user.LastName}. Due in {BorrowDays} days.";
             return RedirectToAction("Index");
+        }
+
+        // Send reminder emails to all borrowers whose books are due within 12 hours
+        [HttpPost]
+        public async Task<IActionResult> SendReminder()
+        {
+            var dueCutoff = DateTime.Now.AddHours(12);
+            var dueReservations = await _context.BookReservations
+                .Include(r => r.User)
+                .Include(r => r.Book)
+                .Where(r => r.Status == "PickedUp" && r.DueDate <= dueCutoff && !r.ReminderSent)
+                .ToListAsync();
+
+            int sent = 0;
+            foreach (var r in dueReservations)
+            {
+                if (r.Book == null || r.User == null) continue;
+
+                bool notified = false;
+
+                // Send to Microsoft/Outlook account
+                var outlookEmail = !string.IsNullOrEmpty(r.User.OutlookEmail)
+                    ? r.User.OutlookEmail
+                    : r.User.Email;
+
+                if (!string.IsNullOrEmpty(outlookEmail))
+                {
+                    try
+                    {
+                        await _emailService.SendReturnReminderAsync(
+                            outlookEmail, r.User.FirstName, r.Book.Title, r.DueDate!.Value);
+                        notified = true;
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[REMINDER EMAIL ERROR] {outlookEmail}: {ex.Message}");
+                    }
+                }
+
+                // Send SMS
+                if (!string.IsNullOrEmpty(r.User.PhoneNumber))
+                {
+                    try
+                    {
+                        await _smsService.SendReturnReminderAsync(
+                            r.User.PhoneNumber, r.Book.Title, r.DueDate!.Value);
+                        notified = true;
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[REMINDER SMS ERROR] {r.User.PhoneNumber}: {ex.Message}");
+                    }
+                }
+
+                if (notified)
+                {
+                    r.ReminderSent = true;
+                    sent++;
+                }
+            }
+
+            await _context.SaveChangesAsync();
+            TempData["Success"] = sent > 0
+                ? $"Reminder sent to {sent} borrower(s)."
+                : "No new reminders to send (all already notified or no books due).";
+            return RedirectToAction("Index");
+        }
+
+        // RFID tap for walk-in borrow — returns user info to auto-fill the borrow form
+        [HttpGet]
+        public async Task<IActionResult> FindUserByRfid(string rfid)
+        {
+            var user = await _userManager.Users.FirstOrDefaultAsync(u => u.RFIDNumber == rfid);
+            if (user == null)
+                return Json(new { found = false, message = "RFID card not registered." });
+
+            if (!user.IsActive)
+                return Json(new { found = false, message = "This account is deactivated." });
+
+            var sectionRecord = await _context.Sections
+                .FirstOrDefaultAsync(s => s.SectionName == user.Section);
+
+            return Json(new
+            {
+                found = true,
+                userId = user.Id,
+                studentNumber = user.StudentNumber ?? user.EmployeeNumber,
+                firstName = user.FirstName,
+                lastName = user.LastName,
+                middleName = user.MiddleName ?? "",
+                section = user.Section ?? "",
+                adviserName = sectionRecord?.AdviserName ?? "",
+                userType = user.UserType
+            });
+        }
+
+        // RFID tap at librarian desk — finds student's pending reservation
+        [HttpGet]
+        public async Task<IActionResult> FindByRfid(string rfid)
+        {
+            var user = await _userManager.Users.FirstOrDefaultAsync(u => u.RFIDNumber == rfid);
+            if (user == null)
+                return Json(new { found = false, message = "RFID card not registered." });
+
+            var reservation = await _context.BookReservations
+                .Include(r => r.Book)
+                .Where(r => r.UserId == user.Id && r.Status == "Pending" && r.PickupDeadline >= DateTime.Now)
+                .OrderBy(r => r.CreatedAt)
+                .FirstOrDefaultAsync();
+
+            if (reservation == null)
+                return Json(new { found = false, message = $"No active reservation found for {user.FirstName} {user.LastName}." });
+
+            var timeLeft = reservation.PickupDeadline - DateTime.Now;
+
+            return Json(new
+            {
+                found = true,
+                reservationId = reservation.Id,
+                studentNumber = user.StudentNumber ?? user.EmployeeNumber,
+                fullName = $"{user.LastName}, {user.FirstName} {(string.IsNullOrEmpty(user.MiddleName) ? "" : user.MiddleName[0] + ".")}",
+                section = user.Section,
+                course = user.Course,
+                level = user.Level,
+                bookTitle = reservation.Book?.Title,
+                bookAuthor = reservation.Book?.Author,
+                reservedAt = reservation.CreatedAt.ToString("MMM dd, hh:mm tt"),
+                timeLeft = $"{(int)timeLeft.TotalHours}h {timeLeft.Minutes:D2}m"
+            });
+        }
+
+        // Student places an online reservation
+        [HttpPost]
+        public async Task<IActionResult> Reserve(int bookId)
+        {
+            var userId = _userManager.GetUserId(User);
+            var book = await _context.Books.FindAsync(bookId);
+
+            if (book == null || book.AvailableQuantity <= 0)
+            {
+                TempData["Error"] = "Book is not available for reservation.";
+                return RedirectToAction("Index", "Student");
+            }
+
+            int activeCount = await _context.BookReservations.CountAsync(r =>
+                r.UserId == userId && (r.Status == "Pending" || r.Status == "PickedUp" || r.Status == "Overdue"));
+
+            if (activeCount >= MaxBooksPerUser)
+            {
+                TempData["Error"] = $"You already have {MaxBooksPerUser} active reservations or borrowed books.";
+                return RedirectToAction("Index", "Student");
+            }
+
+            _context.BookReservations.Add(new BookReservation
+            {
+                UserId = userId!,
+                BookId = bookId,
+                Status = "Pending",
+                PickupDeadline = DateTime.Now.AddHours(ReservationWindowHours),
+                ReservationDate = DateTime.Now
+            });
+
+            await _context.SaveChangesAsync();
+            TempData["Success"] = $"Reservation placed. Please pick up the book within {ReservationWindowHours} hours.";
+            return RedirectToAction("Index", "Student");
         }
 
         // Detail view
@@ -127,7 +325,7 @@ namespace BookHiveLibrary.Controllers
             return View(reservation);
         }
 
-        // Approve reservation — librarian confirms student has picked up the book
+        // Grant reservation — student is physically present, hand over the book
         [HttpPost]
         public async Task<IActionResult> Approve(int id)
         {
@@ -137,7 +335,16 @@ namespace BookHiveLibrary.Controllers
 
             if (reservation == null) return NotFound();
 
-            // Enforce 3-book limit
+            // Check 3-hour window
+            if (reservation.PickupDeadline < DateTime.Now)
+            {
+                reservation.Status = "Void";
+                reservation.LibrarianRemarks = "Auto-voided: not picked up within 3 hours.";
+                await _context.SaveChangesAsync();
+                TempData["Error"] = "Reservation has expired (3-hour window passed). It has been voided.";
+                return RedirectToAction("Index");
+            }
+
             int activeCount = await _context.BookReservations.CountAsync(r =>
                 r.UserId == reservation.UserId &&
                 (r.Status == "PickedUp" || r.Status == "Overdue") &&
@@ -149,11 +356,17 @@ namespace BookHiveLibrary.Controllers
                 return RedirectToAction("Index");
             }
 
-            reservation.Status = "Approved";
-            reservation.PickupDeadline = DateTime.Now.AddHours(PickupHours);
+            // Grant = book is handed to student now
+            reservation.Status = "PickedUp";
+            reservation.ActualPickupTime = DateTime.Now;
+            reservation.DueDate = CalculateDueDate();
+            reservation.ReminderSent = false;
+
+            if (reservation.Book != null)
+                reservation.Book.AvailableQuantity = Math.Max(0, reservation.Book.AvailableQuantity - 1);
 
             await _context.SaveChangesAsync();
-            TempData["Success"] = "Reservation approved. Student has 24 hours to pick up.";
+            TempData["Success"] = $"Book granted. Due date: {reservation.DueDate:MMM dd, yyyy}.";
             return RedirectToAction("Index");
         }
 
@@ -184,7 +397,7 @@ namespace BookHiveLibrary.Controllers
 
             reservation.Status = "PickedUp";
             reservation.ActualPickupTime = DateTime.Now;
-            reservation.DueDate = DateTime.Now.AddDays(BorrowDays);
+            reservation.DueDate = CalculateDueDate();
             reservation.ReminderSent = false;
 
             // Decrement available quantity

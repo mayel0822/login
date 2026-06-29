@@ -25,7 +25,48 @@
 </div>
 
 <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-    <h2 class="text-lg font-semibold text-gray-700 mb-6">@(Model.Id == 0 ? "Register New Book" : "Edit Book")</h2>
+    <div class="flex items-center justify-between mb-6">
+        <h2 class="text-2xl font-bold text-gray-800">@(Model.Id == 0 ? "Register New Book" : "Edit Book")</h2>
+        <button type="button" onclick="document.getElementById('importModal').classList.remove('hidden')"
+                class="px-4 py-2 text-sm text-white rounded-lg font-medium flex items-center gap-2" style="background:#1e3a6e;">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+            Import Excel
+        </button>
+    </div>
+
+    <!-- Import Excel Modal -->
+    <div id="importModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-xl shadow-xl w-[600px] overflow-hidden">
+            <div class="px-6 py-4 flex items-center justify-between border-b border-gray-100">
+                <h3 class="text-base font-semibold text-gray-800">Import from Excel</h3>
+                <button type="button" onclick="closeImportModal()" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <div class="px-6 py-5">
+                <form id="importForm" method="post" action="@Url.Action("ImportExcel","Book")" enctype="multipart/form-data">
+                    @Html.AntiForgeryToken()
+                    <div id="dropZone"
+                         ondragover="event.preventDefault(); this.classList.add('border-blue-400','bg-blue-50')"
+                         ondragleave="this.classList.remove('border-blue-400','bg-blue-50')"
+                         ondrop="handleDrop(event)"
+                         onclick="document.getElementById('excelFileInput').click()"
+                         class="border-2 border-dashed border-gray-300 rounded-xl p-10 flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition">
+                        <svg class="w-10 h-10 text-gray-300" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m3.75 9v6m3-3H9m1.5-12H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/></svg>
+                        <p class="text-sm text-gray-500">Drag &amp; drop your Excel file here or</p>
+                        <span class="text-sm font-medium text-blue-600 hover:underline">Browse file</span>
+                        <p id="selectedFileName" class="text-xs text-gray-400 mt-1">No file selected</p>
+                        <input type="file" id="excelFileInput" name="file" accept=".xlsx" class="hidden"
+                               onchange="document.getElementById('selectedFileName').textContent = this.files[0]?.name ?? 'No file selected'" />
+                    </div>
+                </form>
+            </div>
+            <div class="px-6 py-4 border-t border-gray-100 flex gap-3 justify-end">
+                <button type="button" onclick="closeImportModal()" class="px-5 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200">Cancel</button>
+                <button type="button" onclick="submitImport()" class="px-5 py-2 text-white rounded-lg text-sm font-medium" style="background:#1e3a6e;">Import Books</button>
+            </div>
+        </div>
+    </div>
 
     <form method="post" asp-action="Register">
         @Html.AntiForgeryToken()
@@ -116,11 +157,11 @@
             </div>
         </div>
 
-        <div class="flex gap-3 mt-6">
+        <div class="flex gap-3 mt-6 justify-end">
+            <a href="@Url.Action("Index","Book")" class="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200">Cancel</a>
             <button type="submit" class="px-6 py-2 text-white rounded-lg text-sm font-medium" style="background-color:#1e3a6e;">
                 @(Model.Id == 0 ? "Register Book" : "Save Changes")
             </button>
-            <a href="@Url.Action("Index","Book")" class="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200">Cancel</a>
         </div>
     </form>
 </div>
@@ -129,10 +170,30 @@
 <script>
 function updatePreview(url) {
     const preview = document.getElementById('coverPreview');
-    const placeholder = document.getElementById('coverPlaceholder');
     if (url) {
         preview.innerHTML = '<img src="' + url + '" class="w-full h-full object-cover" onerror="this.style.display=\'none\'" />';
     }
+}
+function closeImportModal() {
+    document.getElementById('importModal').classList.add('hidden');
+    document.getElementById('selectedFileName').textContent = 'No file selected';
+    document.getElementById('excelFileInput').value = '';
+}
+function submitImport() {
+    const input = document.getElementById('excelFileInput');
+    if (!input.files.length) { alert('Please select an Excel file first.'); return; }
+    document.getElementById('importForm').submit();
+}
+function handleDrop(e) {
+    e.preventDefault();
+    document.getElementById('dropZone').classList.remove('border-blue-400','bg-blue-50');
+    const file = e.dataTransfer.files[0];
+    if (!file) return;
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    const input = document.getElementById('excelFileInput');
+    input.files = dt.files;
+    document.getElementById('selectedFileName').textContent = file.name;
 }
 </script>
 }

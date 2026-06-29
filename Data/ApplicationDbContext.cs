@@ -18,5 +18,6 @@ namespace BookHiveLibrary.Data
         public DbSet<ComputerSession> ComputerSessions { get; set; }
         public DbSet<RFIDLog> RFIDLogs { get; set; }
         public DbSet<Section> Sections { get; set; }
+        public DbSet<Message> Messages { get; set; }
     }
 }

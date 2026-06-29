@@ -14,7 +14,8 @@
 
             <div class="mb-4">
                 <label class="block text-sm font-medium text-gray-600 mb-1">Level</label>
-                <select name="level" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
+                <select name="level" id="levelSelect" required onchange="onLevelChange()"
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
                     <option value="">Select level...</option>
                     <option value="SHS">SHS</option>
                     <option value="College">College</option>
@@ -27,32 +28,35 @@
 
             <div class="mb-4">
                 <label class="block text-sm font-medium text-gray-600 mb-1">Course / Strand</label>
-                <input type="text" name="course" required placeholder="e.g. STEM, ABM, BSIT..."
-                       class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" />
+                <select name="course" id="courseSelect" required
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
+                    <option value="">Select level first...</option>
+                </select>
             </div>
 
             <div class="mb-4">
                 <label class="block text-sm font-medium text-gray-600 mb-1">Year</label>
-                <select name="year" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
-                    <option value="">Select year...</option>
-                    <option value="1st Year">1st Year</option>
-                    <option value="2nd Year">2nd Year</option>
-                    <option value="3rd Year">3rd Year</option>
-                    <option value="4th Year">4th Year</option>
-                    <option value="Grade 11">Grade 11</option>
-                    <option value="Grade 12">Grade 12</option>
+                <select name="year" id="yearSelect" required
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
+                    <option value="">Select level first...</option>
                 </select>
             </div>
 
-            <div class="mb-6">
+            <div class="mb-4">
                 <label class="block text-sm font-medium text-gray-600 mb-1">Section Name</label>
                 <input type="text" name="sectionName" required placeholder="e.g. Section A, Dahlia..."
                        class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" />
             </div>
 
-            <div class="flex gap-3">
-                <button type="submit" class="px-6 py-2 text-white rounded-lg text-sm font-medium" style="background-color:#1e3a6e;">Save</button>
+            <div class="mb-6">
+                <label class="block text-sm font-medium text-gray-600 mb-1">Adviser Name</label>
+                <input type="text" name="adviserName" placeholder="e.g. Mr. Juan Dela Cruz"
+                       class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" />
+            </div>
+
+            <div class="flex gap-3 justify-end">
                 <button type="reset" class="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200">Cancel</button>
+                <button type="submit" class="px-6 py-2 text-white rounded-lg text-sm font-medium" style="background-color:#1e3a6e;">Save</button>
             </div>
         </form>
     </div>
@@ -61,6 +65,11 @@
     <div class="bg-white rounded-xl shadow-sm border border-gray-100">
         <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
             <h2 class="font-semibold text-gray-700">Sections (@sections.Count)</h2>
+            <button type="button"
+                    onclick="@(sections.Any() ? "document.getElementById('resetModal').classList.remove('hidden')" : "document.getElementById('noSectionToast').classList.remove('hidden'); setTimeout(()=>document.getElementById('noSectionToast').classList.add('hidden'),2500)")"
+                    class="px-3 py-1.5 text-xs text-white rounded-lg" style="background-color:#1e3a6e;">
+                Reset Section
+            </button>
         </div>
         <div class="divide-y divide-gray-100 max-h-[calc(100vh-16rem)] overflow-y-auto">
             @if (!sections.Any())
@@ -72,7 +81,10 @@
                 <div class="flex items-center justify-between px-5 py-3 hover:bg-gray-50">
                     <div>
                         <p class="text-sm font-medium text-gray-800">@s.SectionName</p>
-                        <p class="text-xs text-gray-500">@s.Level &bull; @s.Course &bull; @s.Year</p>
+                        @if (!string.IsNullOrEmpty(s.AdviserName))
+                        {
+                            <p class="text-xs text-gray-400">Adviser: @s.AdviserName</p>
+                        }
                     </div>
                     <form method="post" action="@Url.Action("DeleteSection","Librarian")"
                           onsubmit="return confirm('Delete this section?')">
@@ -87,3 +99,136 @@
         </div>
     </div>
 </div>
+
+<!-- No section warning modal -->
+<div id="noSectionToast" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-xl p-6 w-[360px] shadow-xl text-center">
+        <div class="flex items-center justify-center w-12 h-12 rounded-full bg-yellow-100 mx-auto mb-4">
+            <svg class="w-6 h-6 text-yellow-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+            </svg>
+        </div>
+        <h3 class="text-base font-semibold text-gray-700 mb-2">No Sections Found</h3>
+        <p class="text-sm text-gray-400 mb-5">There are no sections listed yet. Add a section first before resetting.</p>
+        <button onclick="document.getElementById('noSectionToast').classList.add('hidden')"
+                class="px-6 py-2 text-white rounded-lg text-sm font-medium" style="background-color:#1e3a6e;">OK</button>
+    </div>
+</div>
+
+<!-- Reset Section Modal -->
+<div id="resetModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-xl p-6 w-[460px] shadow-xl">
+        <h3 class="text-lg font-semibold text-gray-700 mb-1">Reset Sections</h3>
+        <p class="text-sm text-gray-400 mb-5">Select which level to reset. This will delete all sections under that level.</p>
+
+        <form method="post" action="@Url.Action("DeleteAllSections","Librarian")"
+              onsubmit="return confirm('Reset all sections for the selected level? This cannot be undone.')">
+            @Html.AntiForgeryToken()
+
+            <div class="space-y-3 mb-6">
+                <label class="flex items-start gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
+                    <input type="radio" name="levelGroup" value="JHS" class="mt-0.5" required />
+                    <div>
+                        <p class="text-sm font-medium text-gray-700">Junior High School (Grade 7–10)</p>
+                        <p class="text-xs text-gray-400">Resets every academic year</p>
+                    </div>
+                </label>
+                <label class="flex items-start gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
+                    <input type="radio" name="levelGroup" value="SHS" class="mt-0.5" />
+                    <div>
+                        <p class="text-sm font-medium text-gray-700">Senior High School (Grade 11–12)</p>
+                        <p class="text-xs text-gray-400">Resets every academic year</p>
+                    </div>
+                </label>
+                <label class="flex items-start gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
+                    <input type="radio" name="levelGroup" value="College" class="mt-0.5" />
+                    <div>
+                        <p class="text-sm font-medium text-gray-700">College</p>
+                        <p class="text-xs text-gray-400">Resets every semester</p>
+                    </div>
+                </label>
+            </div>
+
+            <div class="flex gap-3 justify-end">
+                <button type="button" onclick="document.getElementById('resetModal').classList.add('hidden')"
+                        class="px-5 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200">Cancel</button>
+                <button type="submit" class="px-5 py-2 text-white rounded-lg text-sm font-medium" style="background-color:#1e3a6e;">Reset</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+const data = {
+    SHS: {
+        courses: ['STEM', 'HUMSS', 'ABM', 'GAS', 'TVL', 'SPORTS', 'ARTS & DESIGN'],
+        years:   ['Grade 11', 'Grade 12']
+    },
+    College: {
+        courses: [
+            'BS Information Technology (BSIT)',
+            'BS Computer Science (BSCS)',
+            'BS Information Systems (BSIS)',
+            'BS Accountancy (BSA)',
+            'BS Business Administration (BSBA)',
+            'BS Nursing (BSN)',
+            'BS Midwifery (BSM)',
+            'BS Education - Secondary (BSED)',
+            'BS Education - Elementary (BEED)',
+            'BS Criminology (BSCrim)',
+            'BS Mechanical Engineering (BSME)',
+            'BS Civil Engineering (BSCE)',
+            'BS Electronics Engineering (BSEcE)',
+            'BS Computer Engineering (BSCpE)',
+            'BS Electrical Engineering (BSEE)',
+            'BS Architecture (BSArch)',
+            'BS Psychology (BSPsych)',
+            'BS Social Work (BSSW)',
+            'BS Tourism Management (BSTM)',
+            'BS Hospitality Management (BSHM)',
+            'BS Agriculture (BSA)',
+            'BS Biology (BSBio)',
+            'BS Mathematics (BSMath)',
+            'BS Physical Education (BSPE)',
+            'AB Communication (ABComm)',
+            'AB Political Science (ABPS)',
+            'AB English Language Studies (ABELS)',
+            'Doctor of Medicine (MD)',
+            'Juris Doctor (JD)',
+        ],
+        years: ['1st Year', '2nd Year', '3rd Year', '4th Year', '5th Year']
+    },
+    'Grade 7':  { courses: ['Junior High School'], years: ['Grade 7'] },
+    'Grade 8':  { courses: ['Junior High School'], years: ['Grade 8'] },
+    'Grade 9':  { courses: ['Junior High School'], years: ['Grade 9'] },
+    'Grade 10': { courses: ['Junior High School'], years: ['Grade 10'] },
+};
+
+function onLevelChange() {
+    const level = document.getElementById('levelSelect').value;
+    const courseSelect = document.getElementById('courseSelect');
+    const yearSelect = document.getElementById('yearSelect');
+
+    courseSelect.innerHTML = '<option value="">Select course/strand...</option>';
+    yearSelect.innerHTML   = '<option value="">Select year...</option>';
+
+    if (!level || !data[level]) return;
+
+    data[level].courses.forEach(c => {
+        const o = document.createElement('option');
+        o.value = o.textContent = c;
+        courseSelect.appendChild(o);
+    });
+
+    data[level].years.forEach(y => {
+        const o = document.createElement('option');
+        o.value = o.textContent = y;
+        yearSelect.appendChild(o);
+    });
+
+    if (data[level].courses.length === 1) courseSelect.selectedIndex = 1;
+    if (data[level].years.length === 1)   yearSelect.selectedIndex   = 1;
+}
+</script>
+}

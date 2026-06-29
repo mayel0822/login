@@ -151,6 +151,51 @@ namespace BookHiveLibrary.Controllers
             return RedirectToAction("VerifyOtp");
         }
 
+        // ── Student/Professor Test Login ─────────────────────────────────────
+
+        [HttpPost]
+        public async Task<IActionResult> StudentLogin(LoginViewModel model)
+        {
+            ModelState.Remove("OutlookEmail");
+            if (!ModelState.IsValid)
+                return View("Login", model);
+
+            ApplicationUser? user;
+
+            if (model.EmailOrUsername.Contains("@"))
+                user = await _userManager.FindByEmailAsync(model.EmailOrUsername);
+            else
+                user = await _userManager.FindByNameAsync(model.EmailOrUsername);
+
+            if (user == null)
+            {
+                ModelState.AddModelError("", "User not found.");
+                return View("Login", model);
+            }
+
+            if (user.UserType != "Student" && user.UserType != "Professor")
+            {
+                ModelState.AddModelError("", "This login is for Student and Professor accounts only.");
+                return View("Login", model);
+            }
+
+            if (!user.IsActive)
+            {
+                ModelState.AddModelError("", "Your account has been deactivated.");
+                return View("Login", model);
+            }
+
+            var passwordCheck = await _userManager.CheckPasswordAsync(user, model.Password);
+            if (!passwordCheck)
+            {
+                ModelState.AddModelError("", "Password incorrect.");
+                return View("Login", model);
+            }
+
+            await _signInManager.SignInAsync(user, isPersistent: false);
+            return RedirectToDashboard(user.UserType);
+        }
+
         // ── Admin (password) Login ───────────────────────────────────────────
 
         [HttpPost]
@@ -179,6 +224,12 @@ namespace BookHiveLibrary.Controllers
                 return View(model);
             }
 
+            if (!user.IsActive)
+            {
+                ModelState.AddModelError("", "Your account has been deactivated.");
+                return View(model);
+            }
+
             var passwordCheck = await _userManager.CheckPasswordAsync(user, model.Password);
             if (!passwordCheck)
             {
@@ -186,49 +237,9 @@ namespace BookHiveLibrary.Controllers
                 return View(model);
             }
 
-            // Determine which Outlook email to use
-            string outlookEmail = user.OutlookEmail;
-
-            if (string.IsNullOrEmpty(outlookEmail))
-            {
-                if (string.IsNullOrEmpty(model.OutlookEmail))
-                {
-                    TempData["NeedsOutlook"] = true;
-                    TempData["EmailOrUsername"] = model.EmailOrUsername;
-                    TempData["Password"] = model.Password;
-                    ModelState.AddModelError("OutlookEmail", "Please enter your Microsoft Outlook email to receive the OTP.");
-                    return View(model);
-                }
-
-                outlookEmail = model.OutlookEmail;
-            }
-
-            // Send OTP to the Outlook email (not saved to DB yet — saved only after successful verification)
-            string otpCode = GenerateOtp();
-            _context.OtpVerifications.Add(new OtpVerification
-            {
-                Email = outlookEmail,
-                Code = otpCode,
-                ExpirationTime = DateTime.Now.AddMinutes(5),
-                IsUsed = false
-            });
-            await _context.SaveChangesAsync();
-
-            try
-            {
-                await _emailService.SendOtpAsync(outlookEmail, otpCode);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[EMAIL ERROR] {ex.Message}");
-                Console.WriteLine($"[DEV OTP] {outlookEmail} → {otpCode}");
-                TempData["OtpFallback"] = $"Email could not be sent. DEV CODE: {otpCode}";
-            }
-
-            TempData["Email"] = outlookEmail;
-            TempData["AccountEmail"] = user.Email;
-            TempData["PendingOutlookEmail"] = string.IsNullOrEmpty(user.OutlookEmail) ? outlookEmail : null;
-            return RedirectToAction("VerifyOtp");
+            // Sign in directly — Microsoft Authenticator handles MFA for real accounts via OAuth
+            await _signInManager.SignInAsync(user, isPersistent: false);
+            return RedirectToDashboard(user.UserType);
         }
 
         // ── MIS Login ────────────────────────────────────────────────────────

@@ -3,70 +3,172 @@
 @{
     Layout = "~/Views/Shared/_LibrarianLayout.cshtml";
     ViewData["Title"] = "Student Activity";
+    string logType = ViewBag.LogType ?? "Library";
 }
 
 <div class="bg-white rounded-xl shadow-sm border border-gray-100">
     <div class="px-5 py-4 border-b border-gray-100 flex flex-wrap gap-3 items-center justify-between">
         <h2 class="font-semibold text-gray-700">Student Activity Log</h2>
-        <form method="get" class="flex gap-2 flex-wrap">
-            <input type="date" name="date" value="@ViewBag.Date"
+        <form method="get" id="activityFilterForm" class="flex gap-2 flex-wrap">
+            <input type="date" name="date" value="@ViewBag.Date" onchange="document.getElementById('activityFilterForm').submit()"
                    class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" />
-            <select name="activity" class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
-                <option value="">All Activity</option>
-                <option value="Inside" selected="@(ViewBag.Activity == "Inside" ? "selected" : null)">Inside</option>
-                <option value="Left" selected="@(ViewBag.Activity == "Left" ? "selected" : null)">Left</option>
+            <select name="logType" onchange="document.getElementById('activityFilterForm').submit()"
+                    class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
+                <option value="Library" selected="@(logType == "Library" ? "selected" : null)">Library Log</option>
+                <option value="Computer" selected="@(logType == "Computer" ? "selected" : null)">Computer Log</option>
+                <option value="Book" selected="@(logType == "Book" ? "selected" : null)">Book Log</option>
             </select>
-            <button type="submit" class="px-4 py-2 text-sm text-white rounded-lg" style="background-color:#1e3a6e;">Filter</button>
         </form>
     </div>
 
     <div class="overflow-x-auto">
-        <table class="w-full text-sm">
-            <thead class="bg-gray-50 text-gray-500 text-xs uppercase">
-                <tr>
-                    <th class="px-4 py-3 text-left">Stud ID</th>
-                    <th class="px-4 py-3 text-left">Name</th>
-                    <th class="px-4 py-3 text-left">Level</th>
-                    <th class="px-4 py-3 text-left">Course</th>
-                    <th class="px-4 py-3 text-left">Yr</th>
-                    <th class="px-4 py-3 text-left">Section</th>
-                    <th class="px-4 py-3 text-left">Tap In</th>
-                    <th class="px-4 py-3 text-left">Tap Out</th>
-                    <th class="px-4 py-3 text-left">Status</th>
-                </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-100">
-                @foreach (var log in Model)
-                {
-                    var duration = log.TapOutTime.HasValue
-                        ? (log.TapOutTime.Value - log.TapInTime).ToString(@"hh\:mm")
-                        : "—";
-                    <tr class="hover:bg-gray-50">
-                        <td class="px-4 py-3 text-gray-600">@log.User?.StudentNumber</td>
-                        <td class="px-4 py-3 font-medium text-gray-800">@log.User?.FirstName @log.User?.LastName</td>
-                        <td class="px-4 py-3 text-gray-600">@log.User?.Level</td>
-                        <td class="px-4 py-3 text-gray-600">@log.User?.Course</td>
-                        <td class="px-4 py-3 text-gray-600">—</td>
-                        <td class="px-4 py-3 text-gray-600">@log.User?.Section</td>
-                        <td class="px-4 py-3 text-gray-600">@log.TapInTime.ToString("MM/dd hh:mm tt")</td>
-                        <td class="px-4 py-3 text-gray-600">@(log.TapOutTime?.ToString("MM/dd hh:mm tt") ?? "—")</td>
-                        <td class="px-4 py-3">
-                            @if (log.IsInside)
-                            {
-                                <span class="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">Inside</span>
-                            }
-                            else
-                            {
-                                <span class="px-2 py-1 bg-gray-100 text-gray-500 rounded-full text-xs font-medium">Left</span>
-                            }
-                        </td>
+
+        @if (logType == "Computer")
+        {
+            var sessions = ViewBag.ComputerSessions as List<ComputerSession> ?? new List<ComputerSession>();
+            <table class="w-full text-sm">
+                <thead class="bg-gray-50 text-gray-500 text-xs uppercase">
+                    <tr>
+                        <th class="px-4 py-3 text-left">Stud/Emp ID</th>
+                        <th class="px-4 py-3 text-left">Name</th>
+                        <th class="px-4 py-3 text-left">Computer Unit</th>
+                        <th class="px-4 py-3 text-left">Start</th>
+                        <th class="px-4 py-3 text-left">End</th>
+                        <th class="px-4 py-3 text-left">Status</th>
                     </tr>
-                }
-                @if (!Model.Any())
-                {
-                    <tr><td colspan="9" class="px-4 py-8 text-center text-gray-400">No activity records found</td></tr>
-                }
-            </tbody>
-        </table>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    @foreach (var s in sessions)
+                    {
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-4 py-3 text-gray-600">@(s.User?.StudentNumber ?? s.User?.EmployeeNumber)</td>
+                            <td class="px-4 py-3 font-medium text-gray-800">
+                                @s.User?.LastName, @s.User?.FirstName @(string.IsNullOrEmpty(s.User?.MiddleName) ? "" : s.User!.MiddleName![0] + ".")
+                            </td>
+                            <td class="px-4 py-3 text-gray-600">@s.ComputerUnit?.ComputerNumber</td>
+                            <td class="px-4 py-3 text-gray-600">@s.StartTime.ToString("MM/dd hh:mm tt")</td>
+                            <td class="px-4 py-3 text-gray-600">@(s.EndTime?.ToString("MM/dd hh:mm tt") ?? "—")</td>
+                            <td class="px-4 py-3">
+                                @if (s.IsActive)
+                                {
+                                    <span class="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">Active</span>
+                                }
+                                else
+                                {
+                                    <span class="px-2 py-1 bg-gray-100 text-gray-500 rounded-full text-xs font-medium">Ended</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                    @if (!sessions.Any())
+                    {
+                        <tr><td colspan="6" class="px-4 py-8 text-center text-gray-400">No computer log records found</td></tr>
+                    }
+                </tbody>
+            </table>
+        }
+        else if (logType == "Book")
+        {
+            var bookLogs = ViewBag.BookLogs as List<BookReservation> ?? new List<BookReservation>();
+            <table class="w-full text-sm">
+                <thead class="bg-gray-50 text-gray-500 text-xs uppercase">
+                    <tr>
+                        <th class="px-4 py-3 text-left">Stud/Emp ID</th>
+                        <th class="px-4 py-3 text-left">Last Name</th>
+                        <th class="px-4 py-3 text-left">First Name</th>
+                        <th class="px-4 py-3 text-left">M.I.</th>
+                        <th class="px-4 py-3 text-left">Book Title</th>
+                        <th class="px-4 py-3 text-left">Reserved</th>
+                        <th class="px-4 py-3 text-left">Due Date</th>
+                        <th class="px-4 py-3 text-left">Returned</th>
+                        <th class="px-4 py-3 text-left">Status</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    @foreach (var r in bookLogs)
+                    {
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-4 py-3 text-gray-600">@(r.User?.StudentNumber ?? r.User?.EmployeeNumber)</td>
+                            <td class="px-4 py-3 font-medium text-gray-800">@r.User?.LastName</td>
+                            <td class="px-4 py-3 text-gray-800">@r.User?.FirstName</td>
+                            <td class="px-4 py-3 text-gray-600">@(string.IsNullOrEmpty(r.User?.MiddleName) ? "—" : r.User!.MiddleName![0] + ".")</td>
+                            <td class="px-4 py-3 text-gray-700">@r.Book?.Title</td>
+                            <td class="px-4 py-3 text-gray-600">@r.ReservationDate.ToString("MM/dd/yyyy")</td>
+                            <td class="px-4 py-3 text-gray-600">@(r.DueDate?.ToString("MM/dd/yyyy") ?? "—")</td>
+                            <td class="px-4 py-3 text-gray-600">@(r.ActualReturnDate?.ToString("MM/dd/yyyy") ?? "—")</td>
+                            <td class="px-4 py-3">
+                                @{
+                                    var (bg, fg) = r.Status switch {
+                                        "PickedUp" => ("bg-blue-100", "text-blue-700"),
+                                        "Returned" => ("bg-green-100", "text-green-700"),
+                                        "Overdue"  => ("bg-red-100",  "text-red-700"),
+                                        "Approved" => ("bg-teal-100", "text-teal-700"),
+                                        "Denied"   => ("bg-gray-100", "text-gray-500"),
+                                        _          => ("bg-yellow-100","text-yellow-700")
+                                    };
+                                }
+                                <span class="px-2 py-1 rounded-full text-xs font-medium @bg @fg">@r.Status</span>
+                            </td>
+                        </tr>
+                    }
+                    @if (!bookLogs.Any())
+                    {
+                        <tr><td colspan="9" class="px-4 py-8 text-center text-gray-400">No book log records found</td></tr>
+                    }
+                </tbody>
+            </table>
+        }
+        else
+        {
+            <table class="w-full text-sm">
+                <thead class="bg-gray-50 text-gray-500 text-xs uppercase">
+                    <tr>
+                        <th class="px-4 py-3 text-left">Stud ID</th>
+                        <th class="px-4 py-3 text-left">Last Name</th>
+                        <th class="px-4 py-3 text-left">First Name</th>
+                        <th class="px-4 py-3 text-left">M.I.</th>
+                        <th class="px-4 py-3 text-left">Level</th>
+                        <th class="px-4 py-3 text-left">Course</th>
+                        <th class="px-4 py-3 text-left">Yr</th>
+                        <th class="px-4 py-3 text-left">Section</th>
+                        <th class="px-4 py-3 text-left">Tap In</th>
+                        <th class="px-4 py-3 text-left">Tap Out</th>
+                        <th class="px-4 py-3 text-left">Status</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    @foreach (var log in Model)
+                    {
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-4 py-3 text-gray-600">@log.User?.StudentNumber</td>
+                            <td class="px-4 py-3 font-medium text-gray-800">@log.User?.LastName</td>
+                            <td class="px-4 py-3 text-gray-800">@log.User?.FirstName</td>
+                            <td class="px-4 py-3 text-gray-600">@(string.IsNullOrEmpty(log.User?.MiddleName) ? "—" : log.User!.MiddleName![0] + ".")</td>
+                            <td class="px-4 py-3 text-gray-600">@log.User?.Level</td>
+                            <td class="px-4 py-3 text-gray-600">@log.User?.Course</td>
+                            <td class="px-4 py-3 text-gray-600">—</td>
+                            <td class="px-4 py-3 text-gray-600">@log.User?.Section</td>
+                            <td class="px-4 py-3 text-gray-600">@log.TapInTime.ToString("MM/dd hh:mm tt")</td>
+                            <td class="px-4 py-3 text-gray-600">@(log.TapOutTime?.ToString("MM/dd hh:mm tt") ?? "—")</td>
+                            <td class="px-4 py-3">
+                                @if (log.IsInside)
+                                {
+                                    <span class="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">Inside</span>
+                                }
+                                else
+                                {
+                                    <span class="px-2 py-1 bg-gray-100 text-gray-500 rounded-full text-xs font-medium">Left</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                    @if (!Model.Any())
+                    {
+                        <tr><td colspan="11" class="px-4 py-8 text-center text-gray-400">No activity records found</td></tr>
+                    }
+                </tbody>
+            </table>
+        }
+
     </div>
 </div>

@@ -1,0 +1,205 @@
+@{
+    Layout = "~/Views/Shared/_LibrarianLayout.cshtml";
+    ViewData["Title"] = "Messages";
+    var me = ViewBag.Me as BookHiveLibrary.Models.ApplicationUser;
+    var allUsers = ViewBag.AllUsers as List<BookHiveLibrary.Models.ApplicationUser>;
+    var withUserId = ViewBag.WithUserId as string;
+}
+
+<div class="flex gap-4 h-[calc(100vh-112px)]">
+
+    <!-- Sidebar: Conversations -->
+    <div class="w-72 flex-shrink-0 bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col overflow-hidden">
+        <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between" style="background:#1e3a6e;">
+            <span class="text-sm font-semibold text-white">Messages</span>
+            <button onclick="toggleNewMsg()" class="text-white/70 hover:text-white" title="New Message">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+            </button>
+        </div>
+
+        <!-- New message: pick recipient -->
+        <div id="newMsgPanel" class="hidden border-b border-gray-100 p-3 bg-blue-50">
+            <p class="text-xs font-medium text-gray-500 mb-1">Start new conversation</p>
+            <select id="newMsgTarget" class="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none" onchange="openConversation(this.value)">
+                <option value="">Select user…</option>
+                @if (allUsers != null)
+                {
+                    foreach (var u in allUsers)
+                    {
+                        <option value="@u.Id">@u.FirstName @u.LastName (@u.UserType)</option>
+                    }
+                }
+            </select>
+        </div>
+
+        <!-- Conversation list -->
+        <div id="convoList" class="flex-1 overflow-y-auto divide-y divide-gray-100">
+            <p class="px-4 py-6 text-center text-xs text-gray-400">Loading…</p>
+        </div>
+    </div>
+
+    <!-- Chat panel -->
+    <div class="flex-1 bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col overflow-hidden">
+
+        <!-- Chat header -->
+        <div id="chatHeader" class="px-5 py-3 border-b border-gray-100 flex items-center gap-3" style="background:#1e3a6e;">
+            <div id="chatAvatar" class="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold bg-blue-400 hidden"></div>
+            <div class="flex-1">
+                <p id="chatName" class="text-sm font-semibold text-white">Select a conversation</p>
+                <p id="chatType" class="text-xs text-blue-200"></p>
+            </div>
+        </div>
+
+        <!-- Messages -->
+        <div id="chatMessages" class="flex-1 overflow-y-auto px-5 py-4 space-y-3 bg-gray-50">
+            <div class="flex items-center justify-center h-full">
+                <p class="text-sm text-gray-400">Select a conversation to start messaging</p>
+            </div>
+        </div>
+
+        <!-- Input -->
+        <div class="px-4 py-3 border-t border-gray-100 bg-white">
+            <form id="msgForm" class="flex gap-2" onsubmit="sendMessage(event)">
+                @Html.AntiForgeryToken()
+                <input type="hidden" id="currentReceiverId" />
+                <input type="text" id="msgInput" placeholder="Type a message…" autocomplete="off"
+                       class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" disabled />
+                <button type="submit" id="sendBtn" disabled
+                        class="px-4 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-40" style="background:#1e3a6e;">
+                    Send
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+const myId = '@me?.Id';
+let activeUserId = '@withUserId' || null;
+let pollTimer = null;
+
+// ── Sidebar ───────────────────────────────────────────────────
+async function loadConvoList() {
+    const res  = await fetch('/Message/GetConversationList');
+    const list = await res.json();
+    const el   = document.getElementById('convoList');
+    if (!list.length) {
+        el.innerHTML = '<p class="px-4 py-6 text-center text-xs text-gray-400">No conversations yet.<br>Click the pencil icon to start one.</p>';
+        return;
+    }
+    el.innerHTML = list.map(c => `
+        <div onclick="openConversation('${c.userId}')"
+             class="px-4 py-3 cursor-pointer hover:bg-blue-50 transition ${activeUserId === c.userId ? 'bg-blue-50 border-l-2 border-blue-600' : ''}"
+             id="convo-${c.userId}">
+            <div class="flex items-center gap-2">
+                <div class="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0" style="background:#1e3a6e;">
+                    ${c.name.charAt(0).toUpperCase()}
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm font-medium text-gray-800 truncate">${c.name}</span>
+                        ${c.unread > 0 ? `<span class="ml-1 w-4 h-4 rounded-full text-[10px] font-bold text-white flex items-center justify-center flex-shrink-0" style="background:#e53e3e;">${c.unread}</span>` : ''}
+                    </div>
+                    <p class="text-xs text-gray-400 truncate">${c.lastMsg}</p>
+                    <p class="text-[10px] text-gray-300 mt-0.5">${c.sentAt}</p>
+                </div>
+            </div>
+        </div>`).join('');
+}
+
+function toggleNewMsg() {
+    document.getElementById('newMsgPanel').classList.toggle('hidden');
+}
+
+// ── Chat ──────────────────────────────────────────────────────
+async function openConversation(userId) {
+    if (!userId) return;
+    activeUserId = userId;
+    document.getElementById('currentReceiverId').value = userId;
+    document.getElementById('msgInput').disabled   = false;
+    document.getElementById('sendBtn').disabled    = false;
+    document.getElementById('newMsgPanel').classList.add('hidden');
+    document.getElementById('newMsgTarget').value  = '';
+    await fetchMessages();
+    loadConvoList();
+    clearInterval(pollTimer);
+    pollTimer = setInterval(fetchMessages, 5000);
+}
+
+async function fetchMessages() {
+    if (!activeUserId) return;
+    const res  = await fetch('/Message/GetConversation?otherUserId=' + activeUserId);
+    const data = await res.json();
+
+    document.getElementById('chatName').textContent = data.otherName;
+    document.getElementById('chatType').textContent = data.otherType;
+    const av = document.getElementById('chatAvatar');
+    av.textContent = data.otherName.charAt(0).toUpperCase();
+    av.classList.remove('hidden');
+
+    const box = document.getElementById('chatMessages');
+    if (!data.messages.length) {
+        box.innerHTML = '<div class="flex items-center justify-center h-full"><p class="text-sm text-gray-400">No messages yet. Say hello!</p></div>';
+        return;
+    }
+    box.innerHTML = data.messages.map(m => {
+        const mine = m.senderId === myId;
+        return `<div class="flex ${mine ? 'justify-end' : 'justify-start'}">
+            <div class="max-w-[65%]">
+                <div class="px-3 py-2 rounded-2xl text-sm ${mine ? 'text-white rounded-br-sm' : 'bg-white text-gray-800 border border-gray-200 rounded-bl-sm'}"
+                     style="${mine ? 'background:#1e3a6e;' : ''}">
+                    ${escHtml(m.content)}
+                </div>
+                <p class="text-[10px] text-gray-400 mt-0.5 ${mine ? 'text-right' : ''}">${m.sentAt}</p>
+            </div>
+        </div>`;
+    }).join('');
+    box.scrollTop = box.scrollHeight;
+    updateEnvelopeBadge();
+}
+
+async function sendMessage(e) {
+    e.preventDefault();
+    const input    = document.getElementById('msgInput');
+    const content  = input.value.trim();
+    const receiver = document.getElementById('currentReceiverId').value;
+    if (!content || !receiver) return;
+
+    const fd = new FormData();
+    fd.append('receiverId', receiver);
+    fd.append('content', content);
+    fd.append('__RequestVerificationToken', document.querySelector('input[name="__RequestVerificationToken"]').value);
+
+    input.value = '';
+    await fetch('/Message/Send', { method: 'POST', body: fd });
+    await fetchMessages();
+    loadConvoList();
+}
+
+function escHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── Badge sync ────────────────────────────────────────────────
+async function updateEnvelopeBadge() {
+    try {
+        const res  = await fetch('/Message/UnreadCount');
+        const data = await res.json();
+        const badge = document.getElementById('msgBadge');
+        if (badge) {
+            if (data.count > 0) {
+                badge.textContent = data.count > 9 ? '9+' : data.count;
+                badge.classList.remove('hidden');
+            } else {
+                badge.classList.add('hidden');
+            }
+        }
+    } catch {}
+}
+
+// Init
+loadConvoList();
+if (activeUserId) openConversation(activeUserId);
+</script>
+}

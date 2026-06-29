@@ -9,20 +9,28 @@
     <!-- Header with search and filter -->
     <div class="px-5 py-4 border-b border-gray-100 flex flex-wrap gap-3 items-center justify-between">
         <h2 class="font-semibold text-gray-700">Users</h2>
-        <div class="flex gap-2 flex-wrap items-center">
-            <form method="get" class="flex gap-2">
-                <input type="text" name="search" value="@ViewBag.Search"
-                       placeholder="Search by name, ID, email..."
-                       class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 w-56" />
-                <select name="userType" class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
+        <div class="flex gap-3 items-center">
+            <form method="get" class="flex items-center border border-gray-300 rounded-full overflow-hidden shadow-sm bg-white">
+                <!-- Dropdown filter -->
+                <select name="userType"
+                        class="text-sm text-gray-600 px-3 py-2 bg-gray-50 border-r border-gray-300 focus:outline-none">
                     <option value="">All Users</option>
                     <option value="Student" selected="@(ViewBag.UserType == "Student" ? "selected" : null)">Students</option>
                     <option value="Professor" selected="@(ViewBag.UserType == "Professor" ? "selected" : null)">Professors</option>
                 </select>
-                <button type="submit" class="px-4 py-2 text-sm text-white rounded-lg" style="background-color:#1e3a6e;">Search</button>
+                <!-- Search input -->
+                <input type="text" name="search" value="@ViewBag.Search"
+                       placeholder="Search by name, ID, email..."
+                       class="text-sm px-4 py-2 w-64 focus:outline-none bg-white" />
+                <!-- Search button with icon -->
+                <button type="submit" class="px-4 py-2 flex items-center justify-center bg-white hover:bg-gray-50">
+                    <svg class="w-4 h-4" fill="none" stroke="#1e3a6e" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z"/>
+                    </svg>
+                </button>
             </form>
             <a href="@Url.Action("Registration","Librarian")"
-               class="px-4 py-2 text-sm text-white rounded-lg" style="background-color:#1e3a6e;">+ Add User</a>
+               class="px-4 py-2 text-sm text-white rounded-full" style="background-color:#1e3a6e;">+ Add User</a>
         </div>
     </div>
 
@@ -31,8 +39,7 @@
             <thead class="bg-gray-50 text-gray-500 text-xs uppercase">
                 <tr>
                     <th class="px-4 py-3 text-left">Stud/Emp ID</th>
-                    <th class="px-4 py-3 text-left">Last Name</th>
-                    <th class="px-4 py-3 text-left">First Name</th>
+                    <th class="px-4 py-3 text-left">Name</th>
                     <th class="px-4 py-3 text-left">Email</th>
                     <th class="px-4 py-3 text-left">Phone</th>
                     <th class="px-4 py-3 text-left">Type</th>
@@ -47,8 +54,7 @@
                         <td class="px-4 py-3 text-gray-600">
                             @(user.UserType == "Student" ? user.StudentNumber : user.EmployeeNumber)
                         </td>
-                        <td class="px-4 py-3 font-medium text-gray-800">@user.LastName</td>
-                        <td class="px-4 py-3 text-gray-700">@user.FirstName</td>
+                        <td class="px-4 py-3 font-medium text-gray-800">@user.LastName, @user.FirstName @(string.IsNullOrEmpty(user.MiddleName) ? "" : user.MiddleName[0] + ".")</td>
                         <td class="px-4 py-3 text-gray-600">@user.Email</td>
                         <td class="px-4 py-3 text-gray-600">@user.PhoneNumber</td>
                         <td class="px-4 py-3">
@@ -85,7 +91,7 @@
                 }
                 @if (!Model.Any())
                 {
-                    <tr><td colspan="8" class="px-4 py-8 text-center text-gray-400">No users found</td></tr>
+                    <tr><td colspan="7" class="px-4 py-8 text-center text-gray-400">No users found</td></tr>
                 }
             </tbody>
         </table>

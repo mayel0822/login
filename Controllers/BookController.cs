@@ -3,6 +3,7 @@ using BookHiveLibrary.Models;
 using BookHiveLibrary.ViewModels;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using OfficeOpenXml;
 using QRCoder;
 
 namespace BookHiveLibrary.Controllers
@@ -125,6 +126,100 @@ namespace BookHiveLibrary.Controllers
             await _context.SaveChangesAsync();
             TempData["Success"] = "Book updated successfully.";
             return RedirectToAction("Index");
+        }
+
+        // Import books from Excel
+        [HttpPost]
+        public async Task<IActionResult> ImportExcel(IFormFile file)
+        {
+            if (file == null || file.Length == 0)
+            {
+                TempData["Error"] = "Please select an Excel file.";
+                return RedirectToAction("Register");
+            }
+
+            ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
+
+            var importedIds = new List<int>();
+            var errors = new List<string>();
+
+            using var stream = new MemoryStream();
+            await file.CopyToAsync(stream);
+            using var package = new ExcelPackage(stream);
+
+            var ws = package.Workbook.Worksheets.FirstOrDefault();
+            if (ws == null)
+            {
+                TempData["Error"] = "Excel file has no worksheets.";
+                return RedirectToAction("Register");
+            }
+
+            // Row 1 = header, data starts row 2
+            for (int row = 2; row <= ws.Dimension?.End.Row; row++)
+            {
+                var title = ws.Cells[row, 1].Text.Trim();
+                if (string.IsNullOrEmpty(title)) continue;
+
+                var book = new Book
+                {
+                    Title         = title,
+                    Author        = ws.Cells[row, 2].Text.Trim(),
+                    Category      = ws.Cells[row, 3].Text.Trim(),
+                    GradeLevel    = ws.Cells[row, 4].Text.Trim(),
+                    CallNumber    = ws.Cells[row, 5].Text.Trim(),
+                    AisleLocation = ws.Cells[row, 6].Text.Trim(),
+                    PublishedYear = ws.Cells[row, 7].Text.Trim(),
+                    TotalQuantity     = int.TryParse(ws.Cells[row, 8].Text.Trim(), out var qty) ? qty : 1,
+                    AvailableQuantity = int.TryParse(ws.Cells[row, 8].Text.Trim(), out var qty2) ? qty2 : 1,
+                };
+
+                _context.Books.Add(book);
+                await _context.SaveChangesAsync();
+                importedIds.Add(book.Id);
+            }
+
+            if (!importedIds.Any())
+            {
+                TempData["Error"] = "No valid rows found. Make sure row 1 is a header and data starts on row 2.";
+                return RedirectToAction("Register");
+            }
+
+            TempData["ImportedIds"] = string.Join(",", importedIds);
+            TempData["Success"] = $"{importedIds.Count} book(s) imported. Review and complete the details below.";
+            return RedirectToAction("ImportReview");
+        }
+
+        // Review table after import
+        public async Task<IActionResult> ImportReview()
+        {
+            var idString = TempData["ImportedIds"] as string ?? "";
+            if (string.IsNullOrEmpty(idString))
+                return RedirectToAction("Index");
+
+            // Keep TempData alive for page refreshes
+            TempData.Keep("ImportedIds");
+
+            var ids = idString.Split(',').Select(int.Parse).ToList();
+            var books = await _context.Books
+                .Where(b => ids.Contains(b.Id))
+                .OrderBy(b => b.Title)
+                .ToListAsync();
+
+            return View(books);
+        }
+
+        // AJAX: save cover + synopsis for one book during review
+        [HttpPost]
+        public async Task<IActionResult> UpdateBookDetails(int id, string? coverImageUrl, string? description)
+        {
+            var book = await _context.Books.FindAsync(id);
+            if (book == null) return NotFound();
+
+            book.CoverImageUrl = coverImageUrl ?? "";
+            book.Description   = description   ?? "";
+            await _context.SaveChangesAsync();
+
+            return Json(new { success = true });
         }
 
         // Archive Book

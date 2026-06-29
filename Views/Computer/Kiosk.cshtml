@@ -1,0 +1,234 @@
+@{
+    Layout = null;
+    var pc = ViewBag.PcNumber as string ?? "";
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@pc — BookHive Library</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: #f0f4f8;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            text-align: center;
+        }
+
+        /* ── Active state ── */
+        #screen-active {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+        }
+        .pc-label {
+            font-size: 13px;
+            font-weight: 600;
+            color: #fff;
+            background: #1e3a6e;
+            padding: 4px 16px;
+            border-radius: 20px;
+            letter-spacing: .04em;
+        }
+        .user-name {
+            font-size: 22px;
+            font-weight: 700;
+            color: #1e293b;
+        }
+        .user-section {
+            font-size: 14px;
+            color: #64748b;
+        }
+        .timer-box {
+            margin-top: 8px;
+            background: #fff;
+            border-radius: 20px;
+            padding: 28px 48px;
+            box-shadow: 0 4px 24px rgba(0,0,0,.08);
+        }
+        .timer-label {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            color: #94a3b8;
+            margin-bottom: 6px;
+        }
+        #kiosk-timer {
+            font-size: 64px;
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+            color: #1e3a6e;
+            letter-spacing: .02em;
+        }
+        #kiosk-timer.warning { color: #d97706; }
+        #kiosk-timer.expired { color: #dc2626; }
+        .bar-track {
+            width: 320px;
+            height: 8px;
+            background: #e2e8f0;
+            border-radius: 99px;
+            overflow: hidden;
+            margin-top: 14px;
+        }
+        #kiosk-bar {
+            height: 100%;
+            border-radius: 99px;
+            background: #1e3a6e;
+            transition: width 1s linear;
+        }
+
+        /* ── Time-up state ── */
+        #screen-expired {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+        }
+        .expired-icon {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: #fee2e2;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .expired-icon svg { color: #dc2626; }
+        .expired-title {
+            font-size: 36px;
+            font-weight: 800;
+            color: #dc2626;
+        }
+        .expired-sub {
+            font-size: 15px;
+            color: #64748b;
+            max-width: 320px;
+            line-height: 1.5;
+        }
+        .expired-box {
+            background: #fff;
+            border-radius: 20px;
+            padding: 32px 48px;
+            box-shadow: 0 4px 24px rgba(0,0,0,.08);
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Active Session Screen -->
+    <div id="screen-active">
+        <span class="pc-label">@pc</span>
+        <p class="user-name" id="k-name">—</p>
+        <p class="user-section" id="k-section">—</p>
+        <div class="timer-box">
+            <p class="timer-label">Time Remaining</p>
+            <div id="kiosk-timer">--:--:--</div>
+            <div class="bar-track"><div id="kiosk-bar" style="width:100%;"></div></div>
+        </div>
+    </div>
+
+    <!-- Time's Up Screen -->
+    <div id="screen-expired" class="expired-box">
+        <div class="expired-icon">
+            <svg width="40" height="40" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="10"/><path stroke-linecap="round" d="M12 8v4m0 4h.01"/>
+            </svg>
+        </div>
+        <p class="expired-title">Time's Up</p>
+        <p class="expired-sub">Your computer session has ended. Please return to the librarian.</p>
+    </div>
+
+    <script>
+    const pcNumber = '@Html.Raw(pc)';
+    let totalSecs = 0;
+    let expired   = false;
+
+    function fmtSecs(s) {
+        if (s < 0) s = 0;
+        const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sc = s % 60;
+        return String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0') + ':' + String(sc).padStart(2,'0');
+    }
+
+    async function poll() {
+        try {
+            const data = await fetch('/Computer/KioskStatus?pc=' + encodeURIComponent(pcNumber)).then(r => r.json());
+
+            if (!data.isActive) {
+                showExpired();
+                return;
+            }
+
+            totalSecs = data.totalSecs;
+            document.getElementById('k-name').textContent    = data.name    || '—';
+            document.getElementById('k-section').textContent = data.section || '—';
+
+            updateDisplay(data.remaining);
+        } catch { /* server unreachable, keep showing last state */ }
+
+        if (!expired) setTimeout(poll, 5000);
+    }
+
+    function updateDisplay(remaining) {
+        if (remaining <= 0) { showExpired(); return; }
+
+        const timer = document.getElementById('kiosk-timer');
+        timer.textContent = fmtSecs(remaining);
+        timer.className   = remaining <= 600 ? 'warning' : '';
+
+        const pct = Math.min((totalSecs - remaining) / totalSecs * 100, 100);
+        const bar = document.getElementById('kiosk-bar');
+        bar.style.width      = (100 - pct) + '%';
+        bar.style.background = remaining <= 600 ? '#d97706' : '#1e3a6e';
+    }
+
+    function showExpired() {
+        if (expired) return;
+        expired = true;
+        document.getElementById('screen-active').style.display  = 'none';
+        document.getElementById('screen-expired').style.display = 'flex';
+    }
+
+    // Tick the displayed remaining time every second between polls
+    let _remaining = 0;
+    async function init() {
+        try {
+            const data = await fetch('/Computer/KioskStatus?pc=' + encodeURIComponent(pcNumber)).then(r => r.json());
+            if (!data.isActive) { showExpired(); return; }
+            totalSecs  = data.totalSecs;
+            _remaining = data.remaining;
+            document.getElementById('k-name').textContent    = data.name    || '—';
+            document.getElementById('k-section').textContent = data.section || '—';
+            tick();
+        } catch { setTimeout(init, 3000); }
+    }
+
+    function tick() {
+        if (expired) return;
+        updateDisplay(_remaining);
+        _remaining--;
+        if (_remaining < 0) { showExpired(); return; }
+        setTimeout(tick, 1000);
+    }
+
+    // Full re-sync every 10 seconds
+    setInterval(async () => {
+        if (expired) return;
+        try {
+            const data = await fetch('/Computer/KioskStatus?pc=' + encodeURIComponent(pcNumber)).then(r => r.json());
+            if (!data.isActive) { showExpired(); return; }
+            _remaining = data.remaining;
+            totalSecs  = data.totalSecs;
+        } catch {}
+    }, 10000);
+
+    init();
+    </script>
+</body>
+</html>
