@@ -1,6 +1,6 @@
-using Microsoft.AspNetCore.Mvc.RazorPages;
+﻿using Microsoft.AspNetCore.Mvc.RazorPages;
 
-namespace BookHiveStudentModule.Pages
+namespace BookHiveLibrary.Pages
 {
     public class ComputerVacancyModel : PageModel
     {

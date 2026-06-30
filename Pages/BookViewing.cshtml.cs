@@ -1,16 +1,16 @@
-using Microsoft.AspNetCore.Mvc.RazorPages;
+﻿using Microsoft.AspNetCore.Mvc.RazorPages;
 
-namespace BookHiveStudentModule.Pages
+namespace BookHiveLibrary.Pages
 {
     public class BookItem
     {
         public string Title { get; set; } = "";
         public string Author { get; set; } = "";
-        public string PublishedYear { get; set; } = "—";
-        public string Category { get; set; } = "—";
+        public string PublishedYear { get; set; } = "â€”";
+        public string Category { get; set; } = "â€”";
         public string Status { get; set; } = "Available";
-        public string Qty { get; set; } = "—";
-        public string Location { get; set; } = "—";
+        public string Qty { get; set; } = "â€”";
+        public string Location { get; set; } = "â€”";
         public string Synopsis { get; set; } = "";
     }
 

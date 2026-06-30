@@ -1,7 +1,7 @@
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 
-namespace BookHiveStudentModule.Pages
+namespace BookHiveLibrary.Pages
 {
     public class IndexModel : PageModel
     {
