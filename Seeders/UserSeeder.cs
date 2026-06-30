@@ -10,12 +10,19 @@ namespace BookHiveLibrary.Seeders
         {
             await CreateUser(
             userManager,
-
-
             "misadmin",
             "MisBookHive@gmail.com",
             "MisBookHivePassword@123",
             "MIS");
+
+            await CreateUser(
+            userManager,
+            "marielle.cunanan",
+            "elleiram.nananuc04@outlook.com",
+            "Ajie0403.",
+            "MIS",
+            "Marielle",
+            "Cunanan");
 
             await CreateUser(
                 userManager,
@@ -44,7 +51,9 @@ namespace BookHiveLibrary.Seeders
         string username,
         string email,
         string password,
-        string role)
+        string role,
+        string firstName = "",
+        string lastName = "")
         {
             var user = await userManager.FindByEmailAsync(email);
 
@@ -55,6 +64,8 @@ namespace BookHiveLibrary.Seeders
                     UserName = username,
                     Email = email,
                     UserType = role,
+                    FirstName = firstName,
+                    LastName = lastName,
                     EmailConfirmed = true,
                     IsFirstLogin = false
                 };
